@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.013
+- Removed the first-run auto-start entirely - "white page, then crash" was reported specifically (and only) when permissions were already granted, which is exactly the condition that used to trigger it. Opening the app is now unconditionally stable regardless of permission state: starting the overlay is always, with zero exceptions, a manual "Start volume overlay" tap.
+- Capped "View trace log" to the most recent ~20,000 characters - the file has been appending since v1.009 across many test cycles by now, and only the newest entries matter for the current crash.
+
 ## 1.012
 - Removed MANAGE_EXTERNAL_STORAGE ("all files access") and the store-log-on-main-storage feature entirely. Reports of an instant crash with *nothing at all* written to the trace log - not even its very first line - started right after that permission was added, which points at something killing the process before the app's own code gets a chance to run at all (a manifest-level permission can do that; a manufacturer security layer treating overlay + foreground-service + all-files-access as a spyware-like combination is a known cause). This is a targeted test of that theory. The trace log keeps working fine from the app's own external-files folder without it.
 - First run now auto-starts the overlay once, directly, right after permissions are granted - no storage detour in the way.

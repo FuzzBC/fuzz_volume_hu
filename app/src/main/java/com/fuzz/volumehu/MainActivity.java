@@ -123,42 +123,26 @@ public class MainActivity extends AppCompatActivity {
         // jumping to Settings or just toasting - wrapped defensively, same
         // reasoning as everywhere else here: this must never crash the app.
         // Skipped right after a crash so it isn't stacked on top of that
-        // dialog. Once permissions are already sorted (nothing left to show
-        // here), that's also the one-time signal to auto-start the overlay -
-        // see maybeFirstRunAutoStart().
+        // dialog.
+        //
+        // NOTE: this used to also auto-start the overlay the first time
+        // permissions were already granted. Removed - "white page, then
+        // crash" was reported specifically (and only) under that exact
+        // condition, meaning VolumeOverlayService.start() dispatching a
+        // moment later is the prime suspect for taking the whole shared
+        // process down before the plain screen ever got to draw. Starting
+        // the overlay is ALWAYS a manual "Start volume overlay" tap now,
+        // with zero exceptions, so this screen is guaranteed stable no
+        // matter what permission state the app is in - needed to actually
+        // reach the trace log instead of racing a crash to get there.
         if (!justShowedCrash) {
             try {
-                boolean showedPermissionsDialog = showMissingPermissionsDialog();
-                if (!showedPermissionsDialog) maybeFirstRunAutoStart();
+                showMissingPermissionsDialog();
             } catch (Exception e) {
-                android.util.Log.w("MainActivity", "permission dialog / first-run auto-start failed", e);
+                android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
             }
         }
         TraceLog.step(this, "MainActivity.onCreate end");
-    }
-
-    /**
-     * The one deliberate exception to "starting the overlay is always a
-     * manual tap": the very first time permissions are already all granted
-     * (right after the user finishes the permissions dialog and reopens the
-     * app), the overlay is started once automatically so first run doesn't
-     * dead-end on a screen full of buttons. Every launch after that is a
-     * manual "Start volume overlay" tap - the previous auto-start-on-every-
-     * open was itself a repeated, hard-to-diagnose crash trigger.
-     */
-    private void maybeFirstRunAutoStart() {
-        if (prefs.isStorageSetupDone()) return; // reused as "first-run auto-start already done"
-        prefs.setStorageSetupDone(true);
-        try {
-            if (canDrawOverlays() && !prefs.wasOverlayStarted()) {
-                TraceLog.step(this, "first-run auto-starting overlay");
-                VolumeOverlayService.start(this);
-                refreshStatus();
-            }
-        } catch (Exception e) {
-            android.util.Log.e("MainActivity", "first-run auto-start failed", e);
-            TraceLog.error(this, "first-run auto-start failed", e);
-        }
     }
 
     /**
@@ -168,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
      * the app can't get this far to show it itself.
      */
     private void showTraceLog() {
-        String log = TraceLog.readAll(this);
+        String log = TraceLog.readTail(this, 20000);
         if (log == null || log.trim().isEmpty()) {
             Toast.makeText(this, "No trace log yet.", Toast.LENGTH_SHORT).show();
             return;

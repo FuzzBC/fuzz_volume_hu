@@ -118,6 +118,21 @@ public final class TraceLog {
         return null;
     }
 
+    /**
+     * The most recent maxChars of the log (the file only ever grows -
+     * appended to across every launch since v1.009 - so after many test
+     * cycles it can get long; the most recent entries are what matter for
+     * diagnosing the latest crash, and a huge TextView is worth avoiding).
+     */
+    public static String readTail(Context ctx, int maxChars) {
+        String full = readAll(ctx);
+        if (full == null) return null;
+        if (full.length() <= maxChars) return full;
+        int cut = full.length() - maxChars;
+        int nl = full.indexOf('\n', cut);
+        return "...(earlier entries trimmed)...\n" + full.substring(nl >= 0 ? nl + 1 : cut);
+    }
+
     private static String readFile(File f) {
         if (f == null || !f.exists()) return null;
         StringBuilder sb = new StringBuilder();
