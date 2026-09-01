@@ -21,6 +21,7 @@ public class Prefs {
     private static final String KEY_VPOS = "vpos";            // 10f..90f, % of screen height
     private static final String KEY_THEME = "theme";          // index into ThemeColors.THEMES
     private static final String KEY_OVERLAY_STARTED = "overlay_started"; // was the overlay running when the app was last used
+    private static final String KEY_STORAGE_SETUP_DONE = "storage_setup_done"; // asked about (or skipped) the main-storage log location once already
 
     private final SharedPreferences sp;
 
@@ -39,4 +40,7 @@ public class Prefs {
 
     public boolean wasOverlayStarted() { return sp.getBoolean(KEY_OVERLAY_STARTED, false); }
     public void setOverlayStarted(boolean started) { sp.edit().putBoolean(KEY_OVERLAY_STARTED, started).apply(); }
+
+    public boolean isStorageSetupDone() { return sp.getBoolean(KEY_STORAGE_SETUP_DONE, false); }
+    public void setStorageSetupDone(boolean done) { sp.edit().putBoolean(KEY_STORAGE_SETUP_DONE, done).apply(); }
 }

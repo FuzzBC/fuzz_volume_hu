@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.011
+- First-run sequencing: once overlay + notification permissions are sorted, the app now prompts once to set the trace log to main storage before ever starting the overlay for the first time - "Set up now" or "Skip". Either way, the moment that's resolved, the overlay starts automatically that one time. This is the only case that still auto-starts it; every other launch remains a deliberate "Start volume overlay" tap.
+
 ## 1.010
 - Added an optional "Store log on main storage" button - grants "all files access" so the trace log writes to a plain /storage/emulated/0/fuzz_volume_trace.log instead of the app's own Android/data folder, visible to any file manager with no special per-folder permission needed. Entirely optional; the log keeps working from its previous location either way.
 - The main screen now shows the log's exact current path directly under the status line.

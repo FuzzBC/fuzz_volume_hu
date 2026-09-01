@@ -42,6 +42,11 @@ public class MainActivity extends AppCompatActivity {
     // plain main screen with the error, never straight back into whatever
     // just crashed. Cleared after being consumed once.
     private boolean justShowedCrash = false;
+    // Set right before sending the user to the "all files access" screen
+    // during first-run setup - onResume then knows this particular return
+    // means "storage step just finished", and auto-starts the overlay once
+    // (the only case that still auto-starts it - see onResume).
+    private boolean awaitingStorageSetupReturn = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -126,15 +131,42 @@ public class MainActivity extends AppCompatActivity {
         // jumping to Settings or just toasting - wrapped defensively, same
         // reasoning as everywhere else here: this must never crash the app.
         // Skipped right after a crash so it isn't stacked on top of that
-        // dialog - it'll ask again next launch if still relevant.
+        // dialog - it'll ask again next launch if still relevant. Only one
+        // dialog gets shown per launch: the storage-setup prompt only comes
+        // up once core permissions are already sorted, so they never stack.
         if (!justShowedCrash) {
             try {
-                showMissingPermissionsDialog();
+                boolean showedPermissionsDialog = showMissingPermissionsDialog();
+                if (!showedPermissionsDialog) maybePromptStorageSetup();
             } catch (Exception e) {
-                android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
+                android.util.Log.w("MainActivity", "permission/setup dialog failed", e);
             }
         }
         TraceLog.step(this, "MainActivity.onCreate end");
+    }
+
+    /**
+     * First-run only: before ever starting the overlay for the first time,
+     * offers to set up the easy-to-find log location, then auto-starts the
+     * overlay once that's resolved (granted or skipped) - see onResume.
+     * Never asked again after the first time either way.
+     */
+    private void maybePromptStorageSetup() {
+        if (prefs.isStorageSetupDone()) return;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || TraceLog.isOnMainStorage(this)) {
+            prefs.setStorageSetupDone(true);
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("One more thing first")
+                .setMessage("Before starting the volume overlay for the first time, it's worth pointing the trace log at an easy-to-find storage location - that way, if starting it ever goes wrong, the log is simple to grab.")
+                .setCancelable(true)
+                .setPositiveButton("Set up now", (d, w) -> {
+                    awaitingStorageSetupReturn = true;
+                    requestMainStorageAccess();
+                })
+                .setNegativeButton("Skip", (d, w) -> prefs.setStorageSetupDone(true))
+                .show();
     }
 
     /**
@@ -181,7 +213,7 @@ public class MainActivity extends AppCompatActivity {
      * happens, rather than a screen just appearing (or a toast that's easy
      * to miss on a head unit's small status bar).
      */
-    private void showMissingPermissionsDialog() {
+    private boolean showMissingPermissionsDialog() {
         java.util.List<String> missing = new java.util.ArrayList<>();
         if (!canDrawOverlays()) {
             missing.add("Display over other apps - lets the floating volume tab draw on top of everything else");
@@ -189,7 +221,7 @@ public class MainActivity extends AppCompatActivity {
         if (!notificationsGranted()) {
             missing.add("Notifications - shows the ongoing status notification that keeps the overlay running");
         }
-        if (missing.isEmpty()) return;
+        if (missing.isEmpty()) return false;
 
         StringBuilder msg = new StringBuilder("FuZz Volume HU needs:\n");
         for (String line : missing) msg.append("\n- ").append(line);
@@ -201,6 +233,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Grant now", (d, w) -> requestNeededPermissions())
                 .setNegativeButton("Not now", null)
                 .show();
+        return true;
     }
 
     private void requestNeededPermissions() {
@@ -286,13 +319,33 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        TraceLog.step(this, "MainActivity.onResume");
+        TraceLog.step(this, "MainActivity.onResume, awaitingStorageSetupReturn=" + awaitingStorageSetupReturn);
         refreshStatus();
         justShowedCrash = false;
-        // Starting the overlay is a deliberate "Start volume overlay" tap
-        // now, not something that happens automatically on every launch -
-        // that auto-start was itself a repeated, hard-to-diagnose crash
-        // trigger. Opening this screen is always just this screen.
+
+        if (awaitingStorageSetupReturn) {
+            // The one deliberate exception to "starting the overlay is
+            // always a manual tap": returning from the first-run storage
+            // setup screen is the signal that onboarding just finished, so
+            // this is the single moment it's started automatically.
+            awaitingStorageSetupReturn = false;
+            prefs.setStorageSetupDone(true);
+            refreshStatus();
+            try {
+                if (canDrawOverlays() && !prefs.wasOverlayStarted()) {
+                    TraceLog.step(this, "auto-starting overlay after first-run storage setup");
+                    VolumeOverlayService.start(this);
+                    refreshStatus();
+                }
+            } catch (Exception e) {
+                android.util.Log.e("MainActivity", "auto-start after storage setup failed", e);
+                TraceLog.error(this, "auto-start after storage setup failed", e);
+            }
+        }
+        // Otherwise, starting the overlay is a deliberate "Start volume
+        // overlay" tap - that auto-start was itself a repeated, hard-to-
+        // diagnose crash trigger. Opening this screen is always just this
+        // screen, except for the one case handled above.
     }
 
     private boolean canDrawOverlays() {
