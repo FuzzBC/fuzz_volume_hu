@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.012
+- Removed MANAGE_EXTERNAL_STORAGE ("all files access") and the store-log-on-main-storage feature entirely. Reports of an instant crash with *nothing at all* written to the trace log - not even its very first line - started right after that permission was added, which points at something killing the process before the app's own code gets a chance to run at all (a manifest-level permission can do that; a manufacturer security layer treating overlay + foreground-service + all-files-access as a spyware-like combination is a known cause). This is a targeted test of that theory. The trace log keeps working fine from the app's own external-files folder without it.
+- First run now auto-starts the overlay once, directly, right after permissions are granted - no storage detour in the way.
+
 ## 1.011
 - First-run sequencing: once overlay + notification permissions are sorted, the app now prompts once to set the trace log to main storage before ever starting the overlay for the first time - "Set up now" or "Skip". Either way, the moment that's resolved, the overlay starts automatically that one time. This is the only case that still auto-starts it; every other launch remains a deliberate "Start volume overlay" tap.
 

@@ -10,5 +10,4 @@
     <string name="check_updates">Check for updates</string>
     <string name="battery_opt_prompt">Exempt from battery optimization</string>
     <string name="view_trace_log">View trace log</string>
-    <string name="storage_access">Store log on main storage</string>
 </resources>
