@@ -130,14 +130,23 @@ public class VolumeOverlayService extends Service {
         vpos = prefs.getVpos();
         themeIndex = prefs.getTheme();
 
-        createNotificationChannel();
-        startForeground(NOTIF_ID, buildNotification());
-        prefs.setOverlayStarted(true);
+        try {
+            createNotificationChannel();
+            startForeground(NOTIF_ID, buildNotification());
+            prefs.setOverlayStarted(true);
 
-        registerVolumeReceiver();
-        buildTabView();
-        addTabWindow();
-        refreshVisuals();
+            registerVolumeReceiver();
+            buildTabView();
+            addTabWindow();
+            refreshVisuals();
+        } catch (Exception e) {
+            // Never let a WindowManager/notification quirk on unusual firmware
+            // crash the whole process - stop cleanly instead, MainActivity's
+            // status text just shows "stopped" and the user can retry.
+            android.util.Log.e("VolumeOverlayService", "startup failed, stopping", e);
+            prefs.setOverlayStarted(false);
+            stopSelf();
+        }
     }
 
     @Override
@@ -149,10 +158,10 @@ public class VolumeOverlayService extends Service {
     public void onDestroy() {
         super.onDestroy();
         prefs.setOverlayStarted(false);
-        try { unregisterReceiver(volumeReceiver); } catch (Exception ignored) {}
-        mainHandler.removeCallbacksAndMessages(null);
-        removeTabWindow();
-        if (panelAdded) { wm.removeView(panelRoot); panelAdded = false; }
+        if (volumeReceiver != null) { try { unregisterReceiver(volumeReceiver); } catch (Exception ignored) {} }
+        if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
+        try { removeTabWindow(); } catch (Exception ignored) {}
+        try { if (panelAdded) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
         stopForeground(true);
     }
 
@@ -227,15 +236,20 @@ public class VolumeOverlayService extends Service {
 
     private void addTabWindow() {
         if (tabAdded) return;
-        tabParams = newOverlayParams(dp(52), dp(108));
-        positionTab();
-        wm.addView(tabRoot, tabParams);
-        tabAdded = true;
+        try {
+            tabParams = newOverlayParams(dp(52), dp(108));
+            positionTab();
+            wm.addView(tabRoot, tabParams);
+            tabAdded = true;
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "addTabWindow failed, stopping", e);
+            stopSelf(); // nothing left to show - don't linger as a foreground service with no UI
+        }
     }
 
     private void removeTabWindow() {
         if (!tabAdded) return;
-        wm.removeView(tabRoot);
+        try { wm.removeView(tabRoot); } catch (Exception ignored) {}
         tabAdded = false;
     }
 
@@ -306,20 +320,27 @@ public class VolumeOverlayService extends Service {
 
     private void openPanel() {
         removeTabWindow();
-        if (panelRoot == null) inflatePanel();
-        panelParams = newOverlayParams(dp(184), WindowManager.LayoutParams.WRAP_CONTENT);
-        positionPanel();
-        wm.addView(panelRoot, panelParams);
-        panelAdded = true;
-        refreshVisuals();
+        try {
+            if (panelRoot == null) inflatePanel();
+            panelParams = newOverlayParams(dp(184), WindowManager.LayoutParams.WRAP_CONTENT);
+            positionPanel();
+            wm.addView(panelRoot, panelParams);
+            panelAdded = true;
+            refreshVisuals();
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "openPanel failed", e);
+            addTabWindow(); // fall back to just the tab rather than leaving nothing on screen
+        }
     }
 
     private void closePanel() {
         hideThemePopup();
-        if (panelAdded) {
-            wm.removeView(panelRoot);
-            panelAdded = false;
-        }
+        try {
+            if (panelAdded) {
+                wm.removeView(panelRoot);
+                panelAdded = false;
+            }
+        } catch (Exception ignored) {}
         addTabWindow();
     }
 

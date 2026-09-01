@@ -49,11 +49,7 @@ public class MainActivity extends AppCompatActivity {
         batteryOptBtn = findViewById(R.id.batteryOptBtn);
         Button checkUpdateBtn = findViewById(R.id.checkUpdateBtn);
 
-        grantOverlayBtn.setOnClickListener(v -> {
-            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivity(i);
-        });
+        grantOverlayBtn.setOnClickListener(v -> openOverlaySettings(true));
 
         toggleServiceBtn.setOnClickListener(v -> {
             if (prefs.wasOverlayStarted()) {
@@ -74,7 +70,9 @@ public class MainActivity extends AppCompatActivity {
                     && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
                 Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:" + getPackageName()));
-                startActivity(i);
+                if (!safeStartActivity(i)) {
+                    Toast.makeText(this, "This device doesn't support that screen - nothing to worry about, the overlay still runs fine without it.", Toast.LENGTH_LONG).show();
+                }
             } else {
                 Toast.makeText(this, "Already exempt.", Toast.LENGTH_SHORT).show();
             }
@@ -90,19 +88,65 @@ public class MainActivity extends AppCompatActivity {
         // there automatically instead of waiting for someone to notice the
         // "Grant permission" button. POST_NOTIFICATIONS (13+) does have a real
         // popup, requested here too so the ongoing notification actually shows.
-        requestNeededPermissions();
+        // Everything here is wrapped defensively: some head-unit firmware ships
+        // without the usual Settings screens for these, and an unresolvable
+        // Intent must never be allowed to crash the app on launch.
+        try {
+            requestNeededPermissions();
+        } catch (Exception e) {
+            android.util.Log.w("MainActivity", "requestNeededPermissions failed", e);
+        }
     }
 
     private void requestNeededPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+            try {
+                ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+            } catch (Exception e) {
+                android.util.Log.w("MainActivity", "POST_NOTIFICATIONS request failed", e);
+            }
         }
         if (!canDrawOverlays()) {
-            Toast.makeText(this, R.string.overlay_perm_needed, Toast.LENGTH_LONG).show();
-            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName())));
+            openOverlaySettings(false);
+        }
+    }
+
+    /**
+     * Opens the "display over other apps" screen for this app, trying the
+     * package-scoped Intent first and falling back to the bare action (some
+     * firmware only supports one form). Never throws - some head units simply
+     * don't ship this screen at all, in which case the user is told to enable
+     * it manually instead of the app crashing trying to open it.
+     *
+     * @param manualTap True when triggered by the "Grant permission" button
+     *                  (always shows a result toast), false for the silent
+     *                  first-launch attempt (only toasts on outright failure).
+     */
+    private void openOverlaySettings(boolean manualTap) {
+        Intent scoped = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+        boolean opened = safeStartActivity(scoped);
+        if (!opened) {
+            opened = safeStartActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+        }
+        if (opened) {
+            if (manualTap) Toast.makeText(this, R.string.overlay_perm_needed, Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Couldn't open that screen automatically on this device. Enable \"Display over other apps\" for FuZz Volume HU from your device's Settings > Apps manually.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Starts an Activity, swallowing any failure (unresolvable Intent, missing
+     *  screen on this firmware, etc.) instead of letting it crash the app. */
+    private boolean safeStartActivity(Intent intent) {
+        try {
+            startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            android.util.Log.w("MainActivity", "startActivity failed for " + intent.getAction(), e);
+            return false;
         }
     }
 
@@ -128,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
         grantOverlayBtn.setEnabled(!overlayOk);
         toggleServiceBtn.setText(running ? R.string.stop_overlay : R.string.start_overlay);
         statusText.setText(overlayOk
-                ? (running ? "Overlay permission granted · widget running" : "Overlay permission granted · widget stopped")
+                ? (running ? "Overlay permission granted - widget running" : "Overlay permission granted - widget stopped")
                 : "Overlay permission not granted yet");
     }
 
@@ -141,8 +185,11 @@ public class MainActivity extends AppCompatActivity {
                         .setTitle("Update available: " + displayVersion)
                         .setMessage(releaseNotes == null || releaseNotes.trim().isEmpty()
                                 ? "A newer version is available on GitHub." : releaseNotes)
-                        .setPositiveButton("Download", (d, w) ->
-                                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl))))
+                        .setPositiveButton("Download", (d, w) -> {
+                            if (!safeStartActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))) {
+                                Toast.makeText(MainActivity.this, "Couldn't open a browser - grab " + tagName + " from GitHub manually.", Toast.LENGTH_LONG).show();
+                            }
+                        })
                         .setNegativeButton("Later", null)
                         .show();
             }
