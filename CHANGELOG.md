@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.009
+- Added a persistent, step-by-step trace log (TraceLog), separate from the crash dialog: every meaningful step through startup (both MainActivity's and VolumeOverlayService's) is appended to a file as it happens, not just written once when something finally throws. Written to external storage - Android/data/com.fuzz.volumehu/files/fuzz_volume_trace.log - so it can be read with any file manager even if the app never manages to show its own UI.
+- Added a "View trace log" button on the main screen to read it in-app too, with a Clear button to reset it.
+- The crash dialog now also names the exact trace log file path.
+
 ## 1.008
 - Found another real gap: VolumeOverlayService.onCreate() only wrapped its second half in try/catch - the first few lines (WindowManager/AudioManager/prefs/theme setup) ran unguarded, and since starting the service is asynchronous, nothing MainActivity does can catch a failure there. The whole method is wrapped now, and it catches Throwable (not just Exception), since a resource or class-loading problem on unusual firmware can surface as an Error that a plain Exception catch lets straight through.
 - Removed the automatic "start the overlay when the app opens" behavior entirely - it was itself a repeated, hard-to-pin-down crash trigger, firing on every single app open. Opening the app is now always just the main screen; starting the overlay is a deliberate tap on "Start volume overlay" so a problem there can actually be isolated and reported instead of racing with a crash-recovery dialog.

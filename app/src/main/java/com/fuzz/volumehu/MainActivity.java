@@ -45,7 +45,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        TraceLog.step(this, "MainActivity.onCreate start");
         setContentView(R.layout.activity_main);
+        TraceLog.step(this, "setContentView done");
         prefs = new Prefs(this);
 
         // No adb on the target head units - this is how a crash actually
@@ -57,7 +59,8 @@ public class MainActivity extends AppCompatActivity {
                 justShowedCrash = true;
                 new AlertDialog.Builder(this)
                         .setTitle("FuZz Volume HU crashed last time")
-                        .setMessage(crash)
+                        .setMessage(crash + "\n\nFull step-by-step trace: \"View trace log\" below, or "
+                                + TraceLog.logFile(this).getAbsolutePath())
                         .setCancelable(false)
                         .setPositiveButton("OK", null)
                         .show();
@@ -71,18 +74,23 @@ public class MainActivity extends AppCompatActivity {
         toggleServiceBtn = findViewById(R.id.toggleServiceBtn);
         batteryOptBtn = findViewById(R.id.batteryOptBtn);
         Button checkUpdateBtn = findViewById(R.id.checkUpdateBtn);
+        Button viewTraceBtn = findViewById(R.id.viewTraceBtn);
+        viewTraceBtn.setOnClickListener(v -> showTraceLog());
+        TraceLog.step(this, "views found, listeners about to be wired");
 
         grantOverlayBtn.setOnClickListener(v -> openOverlaySettings(true));
 
         toggleServiceBtn.setOnClickListener(v -> {
             try {
                 if (prefs.wasOverlayStarted()) {
+                    TraceLog.step(this, "toggleServiceBtn: calling VolumeOverlayService.stop()");
                     VolumeOverlayService.stop(this);
                 } else {
                     if (!canDrawOverlays()) {
                         Toast.makeText(this, R.string.overlay_perm_needed, Toast.LENGTH_LONG).show();
                         return;
                     }
+                    TraceLog.step(this, "toggleServiceBtn: calling VolumeOverlayService.start()");
                     VolumeOverlayService.start(this);
                 }
             } catch (Exception e) {
@@ -123,6 +131,38 @@ public class MainActivity extends AppCompatActivity {
                 android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
             }
         }
+        TraceLog.step(this, "MainActivity.onCreate end");
+    }
+
+    /**
+     * Shows the full step-by-step trace log in a scrollable dialog. The same
+     * file also sits on external storage - Android/data/com.fuzz.volumehu/
+     * files/fuzz_volume_trace.log - readable with any file manager even if
+     * the app can't get this far to show it itself.
+     */
+    private void showTraceLog() {
+        String log = TraceLog.readAll(this);
+        if (log == null || log.trim().isEmpty()) {
+            Toast.makeText(this, "No trace log yet.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        TextView tv = new TextView(this);
+        tv.setText(log);
+        tv.setTextIsSelectable(true);
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tv.setTextSize(10);
+        int pad = (int) (12 * getResources().getDisplayMetrics().density);
+        tv.setPadding(pad, pad, pad, pad);
+        scroll.addView(tv);
+        new AlertDialog.Builder(this)
+                .setTitle("Trace log")
+                .setView(scroll)
+                .setPositiveButton("Close", null)
+                .setNeutralButton("Clear", (d, w) -> {
+                    try { TraceLog.logFile(this).delete(); } catch (Exception ignored) {}
+                })
+                .show();
     }
 
     private boolean notificationsGranted() {
@@ -213,6 +253,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        TraceLog.step(this, "MainActivity.onResume");
         refreshStatus();
         justShowedCrash = false;
         // Starting the overlay is a deliberate "Start volume overlay" tap

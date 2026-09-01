@@ -126,26 +126,39 @@ public class VolumeOverlayService extends Service {
         // moment later - that dispatch runs outside any try/catch a caller
         // could wrap around start(). Everything that can fail must be caught
         // in here, not out there.
+        TraceLog.step(this, "VolumeOverlayService.onCreate start");
         try {
             wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+            TraceLog.step(this, "got WindowManager");
             audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            TraceLog.step(this, "got AudioManager");
             prefs = new Prefs(this);
+            TraceLog.step(this, "created Prefs");
             themedCtx = new ContextThemeWrapper(this, R.style.AppTheme);
+            TraceLog.step(this, "created themedCtx");
             mainHandler = new Handler(Looper.getMainLooper());
             touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+            TraceLog.step(this, "created Handler + touchSlop");
 
             side = prefs.getSide();
             vpos = prefs.getVpos();
             themeIndex = prefs.getTheme();
+            TraceLog.step(this, "read prefs: side=" + side + " vpos=" + vpos + " theme=" + themeIndex);
 
             createNotificationChannel();
+            TraceLog.step(this, "created notification channel");
             startForeground(NOTIF_ID, buildNotification());
+            TraceLog.step(this, "startForeground OK");
             prefs.setOverlayStarted(true);
 
             registerVolumeReceiver();
+            TraceLog.step(this, "registered volume receiver");
             buildTabView();
+            TraceLog.step(this, "built tab view");
             addTabWindow();
+            TraceLog.step(this, "added tab window - tabAdded=" + tabAdded);
             refreshVisuals();
+            TraceLog.step(this, "onCreate SUCCESS");
         } catch (Throwable t) {
             // Throwable, not Exception: on unusual firmware a class-loading
             // or resource problem can surface as an Error, which a plain
@@ -154,6 +167,7 @@ public class VolumeOverlayService extends Service {
             // they share a process. Never let a WindowManager/notification/
             // resource quirk do that - stop cleanly instead.
             android.util.Log.e("VolumeOverlayService", "startup failed, stopping", t);
+            TraceLog.error(this, "VolumeOverlayService.onCreate FAILED", t);
             try { if (prefs != null) prefs.setOverlayStarted(false); } catch (Exception ignored) {}
             stopSelf();
         }
@@ -265,6 +279,7 @@ public class VolumeOverlayService extends Service {
             tabAdded = true;
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "addTabWindow failed, stopping", e);
+            TraceLog.error(this, "addTabWindow FAILED (wm.addView)", e);
             stopSelf(); // nothing left to show - don't linger as a foreground service with no UI
         }
     }

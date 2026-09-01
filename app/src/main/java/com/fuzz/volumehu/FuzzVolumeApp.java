@@ -29,8 +29,10 @@ public class FuzzVolumeApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        TraceLog.step(this, "FuzzVolumeApp.onCreate start");
         final Thread.UncaughtExceptionHandler platformHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
+            TraceLog.error(this, "UNCAUGHT on thread " + thread.getName(), ex);
             try {
                 writeCrash(ex);
             } catch (Exception ignored) {
@@ -49,6 +51,7 @@ public class FuzzVolumeApp extends Application {
                 System.exit(1);
             }
         });
+        TraceLog.step(this, "FuzzVolumeApp.onCreate done, handler installed");
     }
 
     private void writeCrash(Throwable ex) throws Exception {

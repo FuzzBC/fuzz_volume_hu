@@ -51,6 +51,13 @@
         android:id="@+id/checkUpdateBtn"
         android:layout_width="260dp"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
         android:text="@string/check_updates" />
+
+    <Button
+        android:id="@+id/viewTraceBtn"
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:text="@string/view_trace_log" />
 
 </LinearLayout>
