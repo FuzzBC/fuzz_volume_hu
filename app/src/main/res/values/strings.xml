@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">FuZz Volume HU</string>
+    <string name="notif_channel_name">Volume overlay</string>
+    <string name="notif_title">FuZz Volume HU is active</string>
+    <string name="notif_text">Tap to open · hold the tab to close it</string>
+    <string name="overlay_perm_needed">FuZz Volume HU needs \"display over other apps\" permission to show the volume tab.</string>
+    <string name="grant_overlay">Grant permission</string>
+    <string name="start_overlay">Start volume overlay</string>
+    <string name="stop_overlay">Stop volume overlay</string>
+    <string name="check_updates">Check for updates</string>
+    <string name="battery_opt_prompt">Exempt from battery optimization</string>
+</resources>

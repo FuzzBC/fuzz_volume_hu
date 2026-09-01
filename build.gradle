@@ -1,0 +1,32 @@
+// Top-level Gradle build configuration.
+// Redirects the build output directory outside Works_DriveUpload (this
+// folder is Drive-synced) to avoid the sync churning on every build -
+// same convention as the other FuZz apps in this workspace.
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:9.2.1'
+    }
+}
+
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        it.sourceCompatibility = JavaVersion.VERSION_17
+        it.targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildDir = "D:/AndroidBuilds/${rootProject.name}/${project.name}"
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete "D:/AndroidBuilds/${rootProject.name}"
+}

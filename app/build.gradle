@@ -1,0 +1,89 @@
+apply plugin: 'com.android.application'
+
+// Version state lives in version.properties (committed) so a build can read
+// it and the bumpVersionForNextBuild task can increment it after a
+// successful release build without hand-editing this file - same scheme as
+// the other FuZz apps. Release tags are "v<versionCode>" (see UpdateChecker).
+def versionPropsFile = file("${rootDir}/version.properties")
+def versionProps = new Properties()
+versionProps.load(new FileInputStream(versionPropsFile))
+def appVersionCode = project.hasProperty('testVersionCode')
+        ? project.property('testVersionCode').toInteger()
+        : versionProps['versionCode'].toInteger()
+def appVersionMajor = versionProps['versionMajor'] ? versionProps['versionMajor'].toInteger() : 1
+def appVersionName = "${appVersionMajor}." + String.format("%03d", appVersionCode)
+
+android {
+    compileSdk 34
+    namespace "com.fuzz.volumehu"
+
+    defaultConfig {
+        applicationId 'com.fuzz.volumehu'
+        minSdk 24
+        targetSdk 34
+        versionCode appVersionCode
+        versionName appVersionName
+        buildConfigField "int", "VERSION_MAJOR", "${appVersionMajor}"
+        signingConfig signingConfigs.debug
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            debuggable false
+            // Debug key, no separate release signature - same accepted
+            // tradeoff as the other FuZz apps (sideloaded, not Play-listed).
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+// Bundles the root CHANGELOG.md into assets so an in-app "what's new" view
+// (if added later) always ships with what's currently committed.
+tasks.register('copyChangelog', Copy) {
+    from "${rootDir}/CHANGELOG.md"
+    into "${projectDir}/src/main/assets"
+}
+
+tasks.register('publishReleaseToGitHub', Exec) {
+    workingDir "${rootDir}"
+    commandLine 'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'publish_release.ps1'
+}
+
+tasks.register('bumpVersionForNextBuild') {
+    doLast {
+        def next = appVersionCode + 1
+        versionPropsFile.text = "versionMajor=${appVersionMajor}\nversionCode=${next}\n"
+        println "Bumped versionCode ${appVersionCode} -> ${next} (next build will be ${appVersionMajor}.${String.format('%03d', next)})"
+    }
+}
+
+afterEvaluate {
+    tasks.named('preBuild').configure {
+        dependsOn 'copyChangelog'
+    }
+    tasks.named('assembleRelease').configure {
+        finalizedBy 'publishReleaseToGitHub'
+    }
+    tasks.named('publishReleaseToGitHub').configure {
+        finalizedBy 'bumpVersionForNextBuild'
+    }
+    tasks.named('bumpVersionForNextBuild').configure {
+        onlyIf { tasks.named('publishReleaseToGitHub').get().state.failure == null }
+    }
+}

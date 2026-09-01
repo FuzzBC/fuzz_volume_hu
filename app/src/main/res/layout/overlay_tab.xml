@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The always-on floating half-circle. Its background (a GradientDrawable
+     with asymmetric corner radii - flat side against the screen edge,
+     rounded side bulging inward) and fill color are set in code by
+     TabController, since both depend on which edge it's docked to and the
+     live volume. -->
+<FrameLayout xmlns:android="http://schemas.android.com/res/android"
+    android:id="@+id/tabRoot"
+    android:layout_width="52dp"
+    android:layout_height="108dp"
+    android:elevation="6dp">
+
+    <ImageView
+        android:id="@+id/tabIcon"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="center"
+        android:src="@drawable/ic_speaker"
+        android:contentDescription="@string/app_name" />
+
+</FrameLayout>

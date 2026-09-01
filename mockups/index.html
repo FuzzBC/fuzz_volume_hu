@@ -1,0 +1,967 @@
+<title>FuZz Volume HU</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ============================================================
+     TOKENS - harness chrome (theme-aware). The simulated head-unit
+     screen is a deliberately dark/cream "device photo" per the
+     Soft Neumorphic skin you picked, and stays as-is in both themes.
+     ============================================================ */
+  :root{
+    --page-bg: #eef0f3;
+    --surface: #ffffff;
+    --surface-2: #e3e7ec;
+    --border: #d2d8e0;
+    --text: #1b2027;
+    --text-dim: #5a6474;
+    --accent: #b3691f;
+    --accent-ink: #ffffff;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --page-bg: #14161a;
+      --surface: #1b1e24;
+      --surface-2: #23272f;
+      --border: #30353f;
+      --text: #e7e9ed;
+      --text-dim: #929aa8;
+      --accent: #e0a35c;
+      --accent-ink: #14161a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --page-bg: #14161a;
+    --surface: #1b1e24;
+    --surface-2: #23272f;
+    --border: #30353f;
+    --text: #e7e9ed;
+    --text-dim: #929aa8;
+    --accent: #e0a35c;
+    --accent-ink: #14161a;
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--page-bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.01ms !important; transition-duration:0.01ms !important; }
+  }
+
+  .harness{
+    max-width:1180px;
+    margin:0 auto;
+    padding:2.25rem 1.5rem 4rem;
+    display:flex;
+    flex-direction:column;
+    gap:1.4rem;
+  }
+
+  header h1{
+    margin:0 0 .35rem;
+    font-size:1.5rem;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    text-wrap:balance;
+  }
+  header .eyebrow{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    font-weight:600;
+    margin:0 0 .5rem;
+  }
+  header p.sub{
+    margin:0;
+    max-width:66ch;
+    color:var(--text-dim);
+    font-size:.92rem;
+    line-height:1.55;
+  }
+  header p.sub kbd{
+    font-family:var(--mono);
+    font-size:.82em;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:.05em .4em;
+  }
+
+  /* ---------- picker rails ---------- */
+  .rail-group{ display:flex; flex-direction:column; gap:.4rem; }
+  .rail-label{
+    font-family:var(--mono);
+    font-size:.68rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  .skin-rail{
+    display:flex;
+    gap:.5rem;
+    overflow-x:auto;
+    padding:.15rem .15rem .5rem;
+    scrollbar-width:thin;
+  }
+  .skin-chip{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:.5rem;
+    padding:.5rem .75rem;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:.8rem;
+    font-weight:500;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .skin-chip .swatch{
+    width:1.05rem; height:1.05rem; border-radius:50%;
+    flex:none;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);
+  }
+  .skin-chip:hover{ border-color:var(--accent); }
+  .skin-chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .skin-chip[aria-pressed="true"]{
+    background:var(--accent);
+    color:var(--accent-ink);
+    border-color:var(--accent);
+  }
+
+  /* ---------- rig / bezel ---------- */
+  .rig{ display:flex; flex-direction:column; gap:.6rem; }
+  .bezel{
+    background:linear-gradient(155deg,#3a3d43,#17181b 60%);
+    border-radius:22px;
+    padding:1.1rem;
+    box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 18px 40px -18px rgba(0,0,0,.55);
+  }
+  .hu-screen{
+    position:relative;
+    width:100%;
+    aspect-ratio:2.35/1;
+    border-radius:9px;
+    overflow:hidden;
+    background:#e6e2d8;
+    isolation:isolate;
+    touch-action:none;
+    font-family:var(--sans);
+  }
+  .hu-watermark{
+    position:absolute; left:1rem; top:.85rem;
+    font-family:var(--mono);
+    font-size:.68rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:rgba(0,0,0,.28);
+    pointer-events:none;
+  }
+
+  .status-bar{
+    font-family:var(--mono);
+    font-size:.74rem;
+    color:var(--text-dim);
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:.55rem .75rem;
+    display:flex;
+    flex-wrap:wrap;
+    gap:.3rem 1rem;
+  }
+  .status-bar b{ color:var(--text); font-weight:600; }
+
+  /* ============================================================
+     WIDGET - half-circle tab + expanding panel (Soft Neumorphic)
+     ============================================================ */
+  .vol-btn{
+    position:absolute;
+    width:52px; height:108px;
+    top:50%;
+    border:none;
+    background:#e6e2d8;
+    box-shadow:6px 6px 12px rgba(0,0,0,.18), -4px -4px 10px rgba(255,255,255,.7);
+    display:flex; align-items:center;
+    cursor:grab;
+    padding:0;
+    transition:opacity .18s ease, transform .18s ease;
+    z-index:5;
+    -webkit-user-select:none; user-select:none;
+  }
+  .vol-btn.side-left{ left:0; border-radius:0 999px 999px 0; justify-content:flex-end; padding-right:8px; }
+  .vol-btn.side-right{ right:0; border-radius:999px 0 0 999px; justify-content:flex-start; padding-left:8px; }
+  .vol-btn::after{
+    content:"";
+    position:absolute; inset:6px;
+    border-radius:inherit;
+    background:var(--fill-color,#d97706);
+    opacity:.18;
+    pointer-events:none;
+  }
+  .vol-btn svg{ width:22px; height:22px; color:#77592a; flex:none; position:relative; }
+  .vol-btn.hidden{ opacity:0; pointer-events:none; transform:scale(.85); }
+  .vol-btn:active{ cursor:grabbing; }
+
+  .hold-ring{
+    position:absolute; inset:-6px;
+    border-radius:inherit;
+    border:3px solid transparent;
+    pointer-events:none;
+  }
+  .vol-btn.holding .hold-ring{
+    border-top-color:#77592a;
+    border-right-color:#77592a;
+    animation:holdspin .65s linear forwards;
+  }
+  @keyframes holdspin{
+    from{ transform:rotate(-90deg); opacity:.35; }
+    to{ transform:rotate(270deg); opacity:1; }
+  }
+
+  .vol-panel{
+    position:absolute;
+    top:30%;
+    width:184px;
+    height:66%;
+    background:#e6e2d8;
+    box-shadow:10px 10px 22px rgba(0,0,0,.18), -8px -8px 18px rgba(255,255,255,.75);
+    border-radius:18px;
+    display:flex; flex-direction:column;
+    padding:.9rem .8rem .75rem;
+    gap:.55rem;
+    opacity:0;
+    pointer-events:none;
+    transition:transform .22s cubic-bezier(.2,.8,.3,1), opacity .18s ease;
+    z-index:6;
+    color:#3a2f1c;
+  }
+  .vol-panel.side-left{ left:0; transform:translateX(-100%); }
+  .vol-panel.side-right{ right:0; transform:translateX(100%); }
+  .vol-panel.open{ opacity:1; pointer-events:auto; transform:translateX(0); }
+
+  /* ---- volume readout + 5s hold-for-theme affordance ---- */
+  .vol-readout{
+    text-align:center;
+    font-family:var(--mono);
+    cursor:pointer;
+    -webkit-user-select:none; user-select:none;
+    padding:.15rem 0 .3rem;
+    border-radius:10px;
+  }
+  .vol-readout #volNum{ font-size:1.85rem; font-weight:600; font-variant-numeric:tabular-nums; color:#3a2f1c; }
+  .vol-readout .vol-max{ font-size:.82rem; color:#8a7a5c; }
+  .hold-progress{
+    margin:.3rem auto 0;
+    width:70%;
+    height:3px;
+    border-radius:2px;
+    background:rgba(0,0,0,.1);
+    overflow:hidden;
+  }
+  .hold-progress-fill{
+    height:100%; width:0%;
+    background:#b3691f;
+    border-radius:2px;
+  }
+  .vol-readout.charging .hold-progress-fill{ width:100%; transition:width 5000ms linear; }
+  .vol-readout .hint{
+    display:block;
+    font-size:.6rem;
+    letter-spacing:.06em;
+    color:#a5936d;
+    margin-top:.15rem;
+    text-transform:uppercase;
+  }
+
+  .slider-wrap{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:.4rem;
+    min-height:0;
+  }
+  .nudge-btn{
+    width:30px; height:24px;
+    border-radius:7px;
+    border:none;
+    background:#e6e2d8;
+    box-shadow:3px 3px 6px rgba(0,0,0,.16), -2px -2px 5px rgba(255,255,255,.7);
+    color:#77592a;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex:none;
+    visibility:hidden;
+  }
+  .nudge-btn.show{ visibility:visible; }
+  .nudge-btn svg{ width:15px; height:15px; }
+  .nudge-btn.bounce{ animation:nudgebounce .5s cubic-bezier(.3,1.8,.4,1); }
+  @keyframes nudgebounce{
+    0%{ transform:scale(1); } 30%{ transform:scale(1.28); } 100%{ transform:scale(1); }
+  }
+  .nudge-btn.maxed{ background:#5a1a1a; color:#f8e7c8; cursor:not-allowed; box-shadow:none; }
+  .nudge-btn:focus-visible{ outline:2px solid #77592a; outline-offset:2px; }
+
+  .slider-track{
+    position:relative;
+    width:34px;
+    flex:1;
+    min-height:70px;
+    border-radius:17px;
+    background:#ded9cc;
+    box-shadow:inset 3px 3px 6px rgba(0,0,0,.15), inset -3px -3px 6px rgba(255,255,255,.7);
+    cursor:pointer;
+    overflow:visible;
+  }
+  .slider-fill{
+    position:absolute; left:0; right:0; bottom:0;
+    border-radius:17px;
+    background:var(--fill-color,#d97706);
+    transition:background .15s ease;
+    overflow:hidden;
+  }
+  .cap-line{
+    position:absolute; left:-4px; right:-4px;
+    bottom:80%;
+    height:2px;
+    background:rgba(119,89,42,.35);
+  }
+  .slider-thumb{
+    position:absolute; left:50%;
+    width:26px; height:12px;
+    border-radius:6px;
+    background:#f4f1e8;
+    border:1px solid rgba(0,0,0,.15);
+    transform:translate(-50%,50%);
+    box-shadow:0 1px 4px rgba(0,0,0,.4);
+    pointer-events:none;
+  }
+
+  .collapse-btn{
+    align-self:center;
+    width:42px; height:26px;
+    padding:0;
+    border-radius:8px;
+    border:none;
+    background:#e6e2d8;
+    box-shadow:3px 3px 6px rgba(0,0,0,.16), -2px -2px 5px rgba(255,255,255,.7);
+    color:#77592a;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex:none;
+  }
+  .collapse-btn svg{ width:16px; height:16px; }
+  .collapse-btn.side-right svg{ transform:rotate(90deg); }
+  .collapse-btn.side-left svg{ transform:rotate(-90deg); }
+  .collapse-btn:focus-visible{ outline:2px solid #77592a; outline-offset:2px; }
+
+  /* ============================================================
+     BAR STYLE VARIANTS — 6 modern takes on the same track+thumb.
+     Switched via [data-bar] on .slider-wrap; position math (JS)
+     never changes, only how it's drawn.
+     ============================================================ */
+
+  /* 1. Bead (neumorphic default) — spherical bead on a soft groove */
+  .slider-wrap[data-bar="bead"] .slider-thumb{
+    width:30px; height:30px; border-radius:50%;
+    background:radial-gradient(circle at 32% 28%, #fffdf7 0%, #f4f1e8 42%, #ddd6c4 100%);
+    border:1px solid rgba(0,0,0,.12);
+    box-shadow:0 3px 7px rgba(0,0,0,.35), inset 0 1px 1px rgba(255,255,255,.8);
+  }
+
+  /* 2. Glow Orb — thin line, luminous floating orb */
+  .slider-wrap[data-bar="glow"] .slider-track{ width:8px; box-shadow:inset 2px 2px 4px rgba(0,0,0,.18), inset -1px -1px 3px rgba(255,255,255,.6); }
+  .slider-wrap[data-bar="glow"] .slider-fill{ border-radius:4px; filter:saturate(1.3); }
+  .slider-wrap[data-bar="glow"] .slider-thumb{
+    width:34px; height:34px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff 0%, var(--fill-color,#d97706) 55%, var(--fill-color,#d97706) 100%);
+    border:none;
+    box-shadow:0 0 0 4px rgba(255,255,255,.55), 0 0 22px 4px var(--fill-color,#d97706);
+  }
+  .slider-wrap[data-bar="glow"] .cap-line{ background:rgba(119,89,42,.5); height:1px; }
+
+  /* 3. EQ Segments — stacked meter blocks with a glowing marker ball */
+  .slider-wrap[data-bar="eq"] .slider-track{
+    width:40px; border-radius:8px;
+    background:#ded9cc;
+    box-shadow:inset 2px 2px 5px rgba(0,0,0,.16), inset -1px -1px 3px rgba(255,255,255,.6);
+  }
+  .slider-wrap[data-bar="eq"] .slider-fill{
+    border-radius:8px 8px 6px 6px;
+    background-image:
+      repeating-linear-gradient(to bottom, transparent 0 5px, #ded9cc 5px 8px),
+      linear-gradient(to top, #16a34a 0%, #84cc16 30%, #eab308 58%, #f97316 80%, #dc2626 100%);
+  }
+  .slider-wrap[data-bar="eq"] .cap-line{ background:rgba(58,47,28,.4); height:2px; }
+  .slider-wrap[data-bar="eq"] .slider-thumb{
+    width:22px; height:22px; border-radius:50%; left:50%;
+    background:#f4f1e8;
+    border:3px solid var(--fill-color,#d97706);
+    box-shadow:0 0 0 3px rgba(255,255,255,.65), 0 2px 6px rgba(0,0,0,.35);
+  }
+
+  /* 4. Capsule Fader — mixing-console fader with tick rail */
+  .slider-wrap[data-bar="fader"] .slider-track{
+    width:14px; border-radius:7px;
+    background:#d8d2c2;
+    background-image:repeating-linear-gradient(to bottom, rgba(0,0,0,.14) 0 1px, transparent 1px 12.5%);
+    box-shadow:inset 2px 2px 4px rgba(0,0,0,.2);
+  }
+  .slider-wrap[data-bar="fader"] .slider-fill{ border-radius:7px; opacity:.9; }
+  .slider-wrap[data-bar="fader"] .slider-thumb{
+    width:42px; height:18px; border-radius:5px; left:50%;
+    background:linear-gradient(180deg,#faf7ef,#e3ddcb);
+    border:1px solid rgba(0,0,0,.25);
+    box-shadow:0 2px 5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.8);
+  }
+  .slider-wrap[data-bar="fader"] .slider-thumb::after{
+    content:"";
+    position:absolute; left:8px; right:8px; top:50%; height:2px;
+    background:rgba(0,0,0,.35); transform:translateY(-50%); border-radius:2px;
+  }
+
+  /* 5. Liquid Fill — glass tube with a floating surface ring */
+  .slider-wrap[data-bar="liquid"] .slider-track{
+    width:30px; border-radius:15px;
+    background:rgba(255,255,255,.35);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), inset 3px 3px 8px rgba(0,0,0,.12);
+  }
+  .slider-wrap[data-bar="liquid"] .slider-fill{
+    border-radius:15px 15px 6px 6px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--fill-color,#d97706) 70%, white) 0%, var(--fill-color,#d97706) 100%);
+  }
+  .slider-wrap[data-bar="liquid"] .slider-fill::after{
+    content:"";
+    position:absolute; left:0; right:0; top:0; height:5px;
+    background:rgba(255,255,255,.55);
+    border-radius:15px 15px 0 0;
+  }
+  .slider-wrap[data-bar="liquid"] .slider-thumb{
+    width:38px; height:38px; border-radius:50%;
+    background:transparent;
+    border:3px solid #fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.08);
+  }
+
+  /* 6. Ring Ball — minimal line with an outlined ring handle */
+  .slider-wrap[data-bar="ring"] .slider-track{ width:6px; border-radius:3px; box-shadow:inset 1px 1px 3px rgba(0,0,0,.2); }
+  .slider-wrap[data-bar="ring"] .slider-fill{ border-radius:3px; }
+  .slider-wrap[data-bar="ring"] .slider-thumb{
+    width:28px; height:28px; border-radius:50%;
+    background:radial-gradient(circle at center, var(--fill-color,#d97706) 0 4px, #f4f1e8 4px 100%);
+    border:3px solid var(--fill-color,#d97706);
+    box-shadow:0 2px 5px rgba(0,0,0,.3);
+  }
+
+  /* ============================================================
+     THEME POPUP — opened by a 5s hold on the volume number
+     ============================================================ */
+  .theme-popup{
+    position:absolute; inset:0;
+    background:rgba(20,15,8,.5);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:12;
+    padding:1rem;
+  }
+  .theme-popup.open{ display:flex; }
+  .theme-card{
+    width:min(100%, 460px);
+    max-height:92%;
+    background:#f4f1e8;
+    border-radius:16px;
+    box-shadow:0 24px 48px -16px rgba(0,0,0,.5);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  .theme-card-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.8rem .9rem .6rem;
+    border-bottom:1px solid rgba(0,0,0,.08);
+  }
+  .theme-card-head h2{ margin:0; font-size:.95rem; font-weight:600; color:#3a2f1c; }
+  .theme-card-head .theme-close{
+    width:26px; height:26px; border-radius:50%; border:none;
+    background:#e6e2d8; color:#77592a; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .theme-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(64px,1fr));
+    gap:.6rem;
+    padding:.85rem;
+    overflow-y:auto;
+  }
+  .theme-swatch{
+    display:flex; flex-direction:column; align-items:center; gap:.3rem;
+    background:none; border:none; cursor:pointer; padding:.2rem;
+    font-family:var(--sans); color:#5a4a30;
+  }
+  .theme-swatch .ball{
+    width:38px; height:38px; border-radius:50%;
+    box-shadow:0 2px 5px rgba(0,0,0,.25), inset 0 1px 1px rgba(255,255,255,.5);
+    border:2px solid transparent;
+  }
+  .theme-swatch[aria-pressed="true"] .ball{ border-color:#3a2f1c; box-shadow:0 0 0 3px rgba(58,47,28,.18), 0 2px 5px rgba(0,0,0,.25); }
+  .theme-swatch .tname{ font-size:.62rem; text-align:center; line-height:1.15; }
+  .theme-card-foot{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:.6rem;
+    padding:.7rem .9rem;
+    border-top:1px solid rgba(0,0,0,.08);
+    background:rgba(0,0,0,.02);
+  }
+  .theme-current{
+    font-family:var(--mono);
+    font-size:.72rem;
+    color:#8a7a5c;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+  }
+  .theme-done{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:.85rem;
+    padding:.5rem 1.3rem;
+    border-radius:9px;
+    border:none;
+    background:#3a2f1c;
+    color:#f4f1e8;
+    cursor:pointer;
+    box-shadow:0 3px 8px rgba(0,0,0,.25);
+  }
+  .theme-done:hover{ background:#4a3c26; }
+  .theme-done:focus-visible{ outline:2px solid #3a2f1c; outline-offset:2px; }
+
+  /* ---------- closed overlay ---------- */
+  .closed-overlay{
+    position:absolute; inset:0;
+    background:rgba(6,7,9,.88);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:9;
+    font-family:var(--sans);
+  }
+  .closed-overlay:not([hidden]){ display:flex; }
+  .closed-card{ text-align:center; color:#e7e9ed; }
+  .closed-card p{ margin:.15rem 0; }
+  .closed-card .headline{ font-size:1rem; font-weight:600; }
+  .closed-card .closed-sub{ font-family:var(--mono); font-size:.76rem; color:#8b93a3; margin-bottom:.9rem; }
+  .closed-card button{
+    font-family:var(--sans); font-weight:600; font-size:.85rem;
+    padding:.5rem 1.1rem; border-radius:8px; border:1px solid rgba(255,255,255,.25);
+    background:#fff; color:#0c0d10; cursor:pointer;
+  }
+  .closed-card button:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+</style>
+
+<div class="harness">
+  <header>
+    <p class="eyebrow">FuZz Volume HU &mdash; Soft Neumorphic, take three</p>
+    <h1>EQ Segments locked in, theme popup stays open</h1>
+    <p class="sub">EQ Segments is now the default bar/ball (the other five are still here to compare). Holding the <b>volume number</b> for <kbd>5s</kbd> opens the 24-color popup &mdash; picking a theme now just previews it live; the popup stays open until you tap <b>Done</b>.</p>
+  </header>
+
+  <div class="rail-group">
+    <span class="rail-label">Bar &amp; ball style</span>
+    <div class="skin-rail" id="barRail" role="tablist" aria-label="Bar style picker"></div>
+  </div>
+
+  <div class="rig">
+    <div class="bezel">
+      <div class="hu-screen" id="screen">
+        <div class="hu-watermark">FuZz Volume HU</div>
+
+        <button class="vol-btn side-right" id="volBtn" aria-label="Volume control">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M18.6 5.4a9 9 0 0 1 0 13.2"/></svg>
+          <div class="hold-ring" id="holdRing"></div>
+        </button>
+
+        <div class="vol-panel side-right" id="volPanel">
+          <div class="vol-readout" id="volReadout">
+            <span id="volNum">12</span><span class="vol-max">&nbsp;/ 25</span>
+            <div class="hold-progress"><div class="hold-progress-fill" id="holdFill"></div></div>
+            <span class="hint">hold 5s for colors</span>
+          </div>
+          <div class="slider-wrap" id="sliderWrap" data-bar="eq">
+            <button class="nudge-btn" id="nudgeBtn" aria-label="Push past 20">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+            </button>
+            <div class="slider-track" id="track">
+              <div class="cap-line"></div>
+              <div class="slider-fill" id="fill"></div>
+              <div class="slider-thumb" id="thumb"></div>
+            </div>
+          </div>
+          <button class="collapse-btn side-right" id="collapseBtn" aria-label="Collapse panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+          </button>
+        </div>
+
+        <div class="theme-popup" id="themePopup">
+          <div class="theme-card">
+            <div class="theme-card-head">
+              <h2>Volume color</h2>
+              <button class="theme-close" id="themeClose" aria-label="Close">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+            <div class="theme-grid" id="themeGrid"></div>
+            <div class="theme-card-foot">
+              <span class="theme-current" id="themeCurrent">Original</span>
+              <button class="theme-done" id="themeDone" type="button">Done</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="closed-overlay" id="closedOverlay" hidden>
+          <div class="closed-card">
+            <p class="headline">FuZz Volume HU closed</p>
+            <p class="closed-sub" id="closedSub">Position saved.</p>
+            <button id="reopenBtn">Reopen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar" id="status"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var BARS = [
+    {id:"bead",   name:"Bead"},
+    {id:"glow",   name:"Glow Orb"},
+    {id:"eq",     name:"EQ Segments"},
+    {id:"fader",  name:"Capsule Fader"},
+    {id:"liquid", name:"Liquid Fill"},
+    {id:"ring",   name:"Ring Ball"}
+  ];
+
+  var THEMES = [
+    {name:"Original",     low:"#86efac", mid:"#d97706", high:"#dc2626"},
+    {name:"Ember",        low:"#fde68a", mid:"#f97316", high:"#dc2626"},
+    {name:"Ocean",        low:"#67e8f9", mid:"#0ea5e9", high:"#1d4ed8"},
+    {name:"Mint",         low:"#6ee7b7", mid:"#10b981", high:"#047857"},
+    {name:"Grape",        low:"#d8b4fe", mid:"#a855f7", high:"#6d28d9"},
+    {name:"Sunset",       low:"#fecaca", mid:"#fb7185", high:"#be123c"},
+    {name:"Lime",         low:"#d9f99d", mid:"#84cc16", high:"#4d7c0f"},
+    {name:"Rose Gold",    low:"#fbcfe8", mid:"#f472b6", high:"#db2777"},
+    {name:"Steel",        low:"#cbd5e1", mid:"#64748b", high:"#334155"},
+    {name:"Amber Classic",low:"#fde047", mid:"#f59e0b", high:"#b45309"},
+    {name:"Cyber Lime",   low:"#bef264", mid:"#a3e635", high:"#65a30d"},
+    {name:"Blush",        low:"#fecdd3", mid:"#fb7185", high:"#9f1239"},
+    {name:"Arctic",       low:"#e0f2fe", mid:"#7dd3fc", high:"#0369a1"},
+    {name:"Coral",        low:"#fed7aa", mid:"#fb923c", high:"#c2410c"},
+    {name:"Violet Storm", low:"#c4b5fd", mid:"#8b5cf6", high:"#5b21b6"},
+    {name:"Forest",       low:"#bbf7d0", mid:"#22c55e", high:"#14532d"},
+    {name:"Gold",         low:"#fef08a", mid:"#eab308", high:"#a16207"},
+    {name:"Berry",        low:"#f9a8d4", mid:"#db2777", high:"#831843"},
+    {name:"Slate Blue",   low:"#93c5fd", mid:"#3b82f6", high:"#1e40af"},
+    {name:"Peach",        low:"#fed7aa", mid:"#fdba74", high:"#ea580c"},
+    {name:"Emerald Night",low:"#6ee7b7", mid:"#059669", high:"#064e3b"},
+    {name:"Crimson",      low:"#fca5a5", mid:"#ef4444", high:"#7f1d1d"},
+    {name:"Turquoise",    low:"#99f6e4", mid:"#14b8a6", high:"#115e59"},
+    {name:"Mono Ash",     low:"#e5e7eb", mid:"#9ca3af", high:"#374151"},
+    {name:"FuZz Signature",low:"#f3f4f6", mid:"#f87171", high:"#dc2626"}
+  ];
+
+  var VOL_MAX = 25;
+  var DRAG_CAP = 20;
+  var LONGPRESS_MS = 650;
+  var THEME_HOLD_MS = 5000;
+  var TAP_MAX_MS = 350;
+  var DRAG_THRESH = 8;
+  var NUDGE_COOLDOWN = 500;
+  var PANEL_HEIGHT_PCT = 66;
+
+  var screen = document.getElementById('screen');
+  var volBtn = document.getElementById('volBtn');
+  var volPanel = document.getElementById('volPanel');
+  var volReadout = document.getElementById('volReadout');
+  var volNum = document.getElementById('volNum');
+  var holdFill = document.getElementById('holdFill');
+  var sliderWrap = document.getElementById('sliderWrap');
+  var track = document.getElementById('track');
+  var fill = document.getElementById('fill');
+  var thumb = document.getElementById('thumb');
+  var nudgeBtn = document.getElementById('nudgeBtn');
+  var collapseBtn = document.getElementById('collapseBtn');
+  var closedOverlay = document.getElementById('closedOverlay');
+  var closedSub = document.getElementById('closedSub');
+  var reopenBtn = document.getElementById('reopenBtn');
+  var statusBar = document.getElementById('status');
+  var barRail = document.getElementById('barRail');
+  var themePopup = document.getElementById('themePopup');
+  var themeGrid = document.getElementById('themeGrid');
+  var themeClose = document.getElementById('themeClose');
+  var themeDone = document.getElementById('themeDone');
+  var themeCurrent = document.getElementById('themeCurrent');
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem('fuzzvol_proto_v2');
+      if(!raw) return null;
+      var s = JSON.parse(raw);
+      return (s && typeof s === 'object') ? s : null;
+    }catch(e){ return null; }
+  }
+  function saveState(){
+    try{
+      localStorage.setItem('fuzzvol_proto_v2', JSON.stringify({
+        side:state.side, vpos:state.vpos, volume:state.volume, bar:state.bar, theme:state.theme
+      }));
+    }catch(e){}
+  }
+
+  var saved = loadState();
+  var state = Object.assign({
+    side:'right', vpos:50, volume:12, bar:'eq', theme:0, panelOpen:false, closed:false
+  }, saved || {});
+  state.panelOpen = false;
+  state.closed = false;
+
+  function lerp(a,b,t){ return Math.round(a + (b-a)*t); }
+  function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)]; }
+  function rgbToHex(r,g,b){ return '#'+[r,g,b].map(function(x){ return clamp(x,0,255).toString(16).padStart(2,'0'); }).join(''); }
+  function volumeColor(v, theme){
+    var t = clamp(v,0,VOL_MAX)/VOL_MAX;
+    var A=hexToRgb(theme.low), B=hexToRgb(theme.mid), C=hexToRgb(theme.high);
+    var from,to,lt;
+    if(t<=0.5){ from=A; to=B; lt=t/0.5; } else { from=B; to=C; lt=(t-0.5)/0.5; }
+    return rgbToHex(lerp(from[0],to[0],lt), lerp(from[1],to[1],lt), lerp(from[2],to[2],lt));
+  }
+  function currentTheme(){ return THEMES[state.theme] || THEMES[0]; }
+
+  // ---------- bar-style rail ----------
+  BARS.forEach(function(b){
+    var chip = document.createElement('button');
+    chip.className = 'skin-chip';
+    chip.type = 'button';
+    chip.dataset.bar = b.id;
+    chip.innerHTML = '<span>'+b.name+'</span>';
+    chip.addEventListener('click', function(){
+      state.bar = b.id;
+      sliderWrap.dataset.bar = b.id;
+      saveState();
+      render();
+    });
+    barRail.appendChild(chip);
+  });
+  function renderBarRail(){
+    Array.prototype.forEach.call(barRail.children, function(chip){
+      chip.setAttribute('aria-pressed', chip.dataset.bar === state.bar ? 'true' : 'false');
+    });
+  }
+
+  // ---------- theme grid ----------
+  THEMES.forEach(function(th, i){
+    var b = document.createElement('button');
+    b.className = 'theme-swatch';
+    b.type = 'button';
+    b.dataset.theme = i;
+    var ball = document.createElement('span');
+    ball.className = 'ball';
+    ball.style.background = 'linear-gradient(160deg,'+th.low+' 0%, '+th.mid+' 55%, '+th.high+' 100%)';
+    var label = document.createElement('span');
+    label.className = 'tname';
+    label.textContent = th.name;
+    b.appendChild(ball); b.appendChild(label);
+    b.addEventListener('click', function(){
+      // Preview only — the popup stays open so you can compare several
+      // themes against the live tab/fill/ball before committing with Done.
+      state.theme = i;
+      saveState();
+      render();
+    });
+    themeGrid.appendChild(b);
+  });
+  function renderThemeGrid(){
+    Array.prototype.forEach.call(themeGrid.children, function(sw){
+      sw.setAttribute('aria-pressed', Number(sw.dataset.theme) === state.theme ? 'true' : 'false');
+    });
+    themeCurrent.textContent = currentTheme().name;
+  }
+  function openThemePopup(){ themePopup.classList.add('open'); }
+  function closeThemePopup(){ themePopup.classList.remove('open'); }
+  themeDone.addEventListener('click', closeThemePopup);
+  themeClose.addEventListener('click', closeThemePopup);
+  themePopup.addEventListener('click', function(e){ if(e.target === themePopup) closeThemePopup(); });
+
+  // ---------- render ----------
+  function render(){
+    var theme = currentTheme();
+    var color = volumeColor(state.volume, theme);
+
+    volBtn.classList.toggle('side-left', state.side==='left');
+    volBtn.classList.toggle('side-right', state.side==='right');
+    volBtn.style.top = state.vpos + '%';
+    volBtn.style.transform = 'translateY(-50%)';
+    volBtn.style.setProperty('--fill-color', color);
+    volBtn.classList.toggle('hidden', state.panelOpen);
+
+    volPanel.classList.toggle('side-left', state.side==='left');
+    volPanel.classList.toggle('side-right', state.side==='right');
+    var top = clamp(state.vpos - PANEL_HEIGHT_PCT/2, 6, 94-PANEL_HEIGHT_PCT);
+    volPanel.style.top = top + '%';
+    volPanel.classList.toggle('open', state.panelOpen);
+    collapseBtn.classList.toggle('side-left', state.side==='left');
+    collapseBtn.classList.toggle('side-right', state.side==='right');
+
+    volNum.textContent = state.volume;
+    var pct = (state.volume/VOL_MAX)*100;
+    fill.style.height = pct + '%';
+    fill.style.setProperty('--fill-color', color);
+    thumb.style.bottom = pct + '%';
+    thumb.style.setProperty('--fill-color', color);
+    sliderWrap.style.setProperty('--fill-color', color);
+
+    var atCap = state.volume >= DRAG_CAP;
+    nudgeBtn.classList.toggle('show', atCap);
+    nudgeBtn.classList.toggle('maxed', state.volume >= VOL_MAX);
+    nudgeBtn.disabled = state.volume >= VOL_MAX;
+
+    closedOverlay.hidden = !state.closed;
+    if(state.closed){
+      closedSub.textContent = (state.side==='left' ? 'left edge' : 'right edge') + ', ' + Math.round(state.vpos) + '% down - volume ' + state.volume;
+    }
+
+    renderBarRail();
+    renderThemeGrid();
+
+    statusBar.innerHTML =
+      'side=<b>'+state.side+'</b> &nbsp;pos=<b>'+Math.round(state.vpos)+'%</b> &nbsp;volume=<b>'+state.volume+'/25</b> '+
+      (atCap && state.volume < VOL_MAX ? '<b style="color:#dc2626">(drag capped - use arrow)</b>' : '') +
+      ' &nbsp;panel=<b>'+(state.panelOpen?'open':'closed')+'</b> &nbsp;bar=<b>'+state.bar+'</b> &nbsp;theme=<b>'+theme.name+'</b>';
+  }
+
+  // ---------- tab: drag / tap / long-press-close ----------
+  var pressId=null, downX=0, downY=0, downVpos=0, downTime=0, moved=false, dragging=false, longPressTimer=null;
+  function startHold(){ volBtn.classList.add('holding'); }
+  function stopHold(){ volBtn.classList.remove('holding'); }
+
+  volBtn.addEventListener('pointerdown', function(e){
+    if(state.panelOpen || state.closed) return;
+    pressId = e.pointerId;
+    try{ volBtn.setPointerCapture(pressId); }catch(err){}
+    downX=e.clientX; downY=e.clientY; downTime=performance.now();
+    downVpos=state.vpos; moved=false; dragging=false;
+    startHold();
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(function(){
+      if(!moved){ stopHold(); state.closed = true; saveState(); render(); }
+    }, LONGPRESS_MS);
+  });
+  volBtn.addEventListener('pointermove', function(e){
+    if(e.pointerId !== pressId) return;
+    var dx=e.clientX-downX, dy=e.clientY-downY;
+    if(!moved && Math.hypot(dx,dy) > DRAG_THRESH){
+      moved=true; dragging=true; clearTimeout(longPressTimer); stopHold();
+    }
+    if(dragging){
+      var rect = screen.getBoundingClientRect();
+      var vpos = downVpos + (dy/rect.height)*100;
+      state.vpos = clamp(vpos, 10, 90);
+      var px = e.clientX - rect.left;
+      state.side = px > rect.width*0.5 ? 'right' : 'left';
+      render();
+    }
+  });
+  function endPress(e){
+    if(e && e.pointerId !== pressId) return;
+    clearTimeout(longPressTimer); stopHold();
+    var dt = performance.now()-downTime;
+    if(!moved && dt < TAP_MAX_MS && !state.closed){ state.panelOpen = true; render(); saveState(); }
+    else if(dragging){ saveState(); }
+    pressId=null; moved=false; dragging=false;
+  }
+  volBtn.addEventListener('pointerup', endPress);
+  volBtn.addEventListener('pointercancel', endPress);
+
+  // ---------- slider drag (capped at 20) ----------
+  var sliderId=null;
+  function valueFromPointer(e, isDrag){
+    var rect = track.getBoundingClientRect();
+    var t = 1 - clamp((e.clientY - rect.top)/rect.height, 0, 1);
+    var raw = Math.round(t*VOL_MAX);
+    return isDrag ? Math.min(raw, DRAG_CAP) : raw;
+  }
+  track.addEventListener('pointerdown', function(e){
+    sliderId = e.pointerId;
+    try{ track.setPointerCapture(sliderId); }catch(err){}
+    state.volume = clamp(valueFromPointer(e,true), 0, VOL_MAX);
+    render();
+  });
+  track.addEventListener('pointermove', function(e){
+    if(e.pointerId !== sliderId) return;
+    state.volume = clamp(valueFromPointer(e,true), 0, VOL_MAX);
+    render();
+  });
+  function endSlider(e){ if(e && e.pointerId !== sliderId) return; sliderId=null; saveState(); }
+  track.addEventListener('pointerup', endSlider);
+  track.addEventListener('pointercancel', endSlider);
+
+  // ---------- nudge arrow (500ms bounce cooldown) ----------
+  var nudgeLocked = false;
+  nudgeBtn.addEventListener('click', function(){
+    if(nudgeLocked || state.volume >= VOL_MAX) return;
+    state.volume = clamp(state.volume+1, 0, VOL_MAX);
+    render(); saveState();
+    nudgeLocked = true;
+    nudgeBtn.classList.add('bounce');
+    setTimeout(function(){ nudgeLocked=false; nudgeBtn.classList.remove('bounce'); }, NUDGE_COOLDOWN);
+  });
+
+  // ---------- collapse / reopen ----------
+  collapseBtn.addEventListener('click', function(){ state.panelOpen=false; render(); saveState(); });
+  reopenBtn.addEventListener('click', function(){ state.closed=false; render(); });
+
+  // ---------- 5s hold on the number -> theme popup ----------
+  var themeId=null, themeTimer=null, themeMoved=false, themeDownX=0, themeDownY=0;
+  volReadout.addEventListener('pointerdown', function(e){
+    themeId = e.pointerId;
+    try{ volReadout.setPointerCapture(themeId); }catch(err){}
+    themeMoved=false; themeDownX=e.clientX; themeDownY=e.clientY;
+    volReadout.classList.add('charging');
+    clearTimeout(themeTimer);
+    themeTimer = setTimeout(function(){
+      if(!themeMoved){ volReadout.classList.remove('charging'); openThemePopup(); }
+    }, THEME_HOLD_MS);
+  });
+  volReadout.addEventListener('pointermove', function(e){
+    if(e.pointerId !== themeId) return;
+    if(Math.hypot(e.clientX-themeDownX, e.clientY-themeDownY) > DRAG_THRESH){
+      themeMoved = true;
+      clearTimeout(themeTimer);
+      volReadout.classList.remove('charging');
+    }
+  });
+  function endThemeHold(e){
+    if(e && e.pointerId !== themeId) return;
+    clearTimeout(themeTimer);
+    volReadout.classList.remove('charging');
+    themeId=null;
+  }
+  volReadout.addEventListener('pointerup', endThemeHold);
+  volReadout.addEventListener('pointercancel', endThemeHold);
+
+  sliderWrap.dataset.bar = state.bar;
+  render();
+})();
+</script>
