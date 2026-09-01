@@ -75,7 +75,16 @@ public class EqBarView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        try {
+            drawInner(canvas);
+        } catch (Exception e) {
+            android.util.Log.e("EqBarView", "onDraw failed", e);
+        }
+    }
+
+    private void drawInner(Canvas canvas) {
         float w = getWidth(), h = getHeight();
+        if (w <= 0 || h <= 0) return; // not laid out yet - LinearGradient needs a non-degenerate line
         float radius = w / 2f;
         trackRect.set(0, 0, w, h);
         canvas.drawRoundRect(trackRect, radius * 0.4f, radius * 0.4f, trackPaint);
@@ -116,20 +125,25 @@ public class EqBarView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                dragging = true;
-                reportDrag(event.getY());
-                getParent().requestDisallowInterceptTouchEvent(true);
-                return true;
-            case MotionEvent.ACTION_MOVE:
-                if (dragging) reportDrag(event.getY());
-                return true;
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                if (dragging && listener != null) listener.onDragEnd();
-                dragging = false;
-                return true;
+        try {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    dragging = true;
+                    reportDrag(event.getY());
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (dragging) reportDrag(event.getY());
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (dragging && listener != null) listener.onDragEnd();
+                    dragging = false;
+                    return true;
+            }
+        } catch (Exception e) {
+            android.util.Log.e("EqBarView", "onTouchEvent failed", e);
+            return true;
         }
         return super.onTouchEvent(event);
     }

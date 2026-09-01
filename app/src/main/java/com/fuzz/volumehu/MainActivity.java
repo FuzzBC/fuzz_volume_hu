@@ -43,6 +43,22 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         prefs = new Prefs(this);
 
+        // No adb on the target head units - this is how a crash actually
+        // gets seen: FuzzVolumeApp wrote it to a file when it happened, shown
+        // here on the very next launch so it can be read/screenshotted.
+        try {
+            String crash = FuzzVolumeApp.takeLastCrash(this);
+            if (crash != null) {
+                new AlertDialog.Builder(this)
+                        .setTitle("FuZz Volume HU crashed last time")
+                        .setMessage(crash)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        } catch (Exception e) {
+            android.util.Log.w("MainActivity", "showing last crash failed", e);
+        }
+
         statusText = findViewById(R.id.statusText);
         grantOverlayBtn = findViewById(R.id.grantOverlayBtn);
         toggleServiceBtn = findViewById(R.id.toggleServiceBtn);

@@ -210,8 +210,12 @@ public class VolumeOverlayService extends Service {
 
     /** Writes a new volume, always capped at this widget's own ceiling (WIDGET_MAX). */
     private void setRealVolume(int desired) {
-        int clamped = Math.max(0, Math.min(Math.min(desired, WIDGET_MAX), getStreamMax()));
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, clamped, 0);
+        try {
+            int clamped = Math.max(0, Math.min(Math.min(desired, WIDGET_MAX), getStreamMax()));
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, clamped, 0);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "setStreamVolume failed", e);
+        }
         refreshVisuals();
     }
 
@@ -265,6 +269,15 @@ public class VolumeOverlayService extends Service {
     }
 
     private boolean onTabTouch(View v, MotionEvent event) {
+        try {
+            return onTabTouchInner(event);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "onTabTouch failed", e);
+            return true;
+        }
+    }
+
+    private boolean onTabTouchInner(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
                 tabDownRawX = event.getRawX();
@@ -390,15 +403,19 @@ public class VolumeOverlayService extends Service {
     }
 
     private void onNudgeClick() {
-        if (nudgeLocked) return;
-        int raw = getRawVolume();
-        if (raw >= WIDGET_MAX) return;
-        setRealVolume(raw + 1);
-        nudgeLocked = true;
-        nudgeBtn.animate().scaleX(1.3f).scaleY(1.3f).setDuration(140)
-                .withEndAction(() -> nudgeBtn.animate().scaleX(1f).scaleY(1f).setDuration(160).start())
-                .start();
-        mainHandler.postDelayed(() -> nudgeLocked = false, NUDGE_COOLDOWN_MS);
+        try {
+            if (nudgeLocked) return;
+            int raw = getRawVolume();
+            if (raw >= WIDGET_MAX) return;
+            setRealVolume(raw + 1);
+            nudgeLocked = true;
+            nudgeBtn.animate().scaleX(1.3f).scaleY(1.3f).setDuration(140)
+                    .withEndAction(() -> nudgeBtn.animate().scaleX(1f).scaleY(1f).setDuration(160).start())
+                    .start();
+            mainHandler.postDelayed(() -> nudgeLocked = false, NUDGE_COOLDOWN_MS);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "onNudgeClick failed", e);
+        }
     }
 
     // ---------------------------------------------------------- 5s hold -> theme popup
@@ -408,6 +425,15 @@ public class VolumeOverlayService extends Service {
     private final Runnable themeHoldRunnable = this::showThemePopup;
 
     private boolean onThemeHoldTouch(View v, MotionEvent event) {
+        try {
+            return onThemeHoldTouchInner(event);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "onThemeHoldTouch failed", e);
+            return true;
+        }
+    }
+
+    private boolean onThemeHoldTouchInner(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 themeDownX = event.getRawX();
@@ -445,14 +471,22 @@ public class VolumeOverlayService extends Service {
     }
 
     private void showThemePopup() {
-        themePopup.setVisibility(View.VISIBLE);
-        refreshThemeGridSelection();
-        positionPanel();
+        try {
+            themePopup.setVisibility(View.VISIBLE);
+            refreshThemeGridSelection();
+            positionPanel();
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "showThemePopup failed", e);
+        }
     }
 
     private void hideThemePopup() {
-        themePopup.setVisibility(View.GONE);
-        positionPanel();
+        try {
+            themePopup.setVisibility(View.GONE);
+            positionPanel();
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "hideThemePopup failed", e);
+        }
     }
 
     private void populateThemeGrid() {
@@ -472,9 +506,13 @@ public class VolumeOverlayService extends Service {
             ball.setBackground(bg);
 
             item.setOnClickListener(v -> {
-                themeIndex = idx;
-                prefs.setTheme(idx);
-                refreshVisuals();
+                try {
+                    themeIndex = idx;
+                    prefs.setTheme(idx);
+                    refreshVisuals();
+                } catch (Exception e) {
+                    android.util.Log.e("VolumeOverlayService", "theme swatch click failed", e);
+                }
             });
             themeSwatches[i] = item;
             themeGrid.addView(item);
@@ -495,21 +533,28 @@ public class VolumeOverlayService extends Service {
 
     // ---------------------------------------------------------- Shared visual refresh
 
+    // The most frequently-called shared method (every volume change, theme
+    // pick, and external VOLUME_CHANGED_ACTION broadcast runs through here) -
+    // wrapped as a single choke point instead of guarding every caller.
     private void refreshVisuals() {
-        int raw = getRawVolume();
-        int barVal = Math.max(0, Math.min(WIDGET_MAX, raw));
-        int color = ThemeColors.colorFor(themeIndex, barVal);
+        try {
+            int raw = getRawVolume();
+            int barVal = Math.max(0, Math.min(WIDGET_MAX, raw));
+            int color = ThemeColors.colorFor(themeIndex, barVal);
 
-        updateTabAppearance(color);
+            updateTabAppearance(color);
 
-        if (panelAdded && volNum != null) {
-            volNum.setText(String.valueOf(raw));
-            eqBar.setBarValue(barVal);
-            eqBar.setBallColor(color);
-            boolean showNudge = raw >= EqBarView.DRAG_CAP && raw < WIDGET_MAX;
-            nudgeBtn.setVisibility(showNudge ? View.VISIBLE : View.INVISIBLE);
-            collapseBtn.setRotation("right".equals(side) ? 90f : -90f);
-            if (themePopup.getVisibility() == View.VISIBLE) refreshThemeGridSelection();
+            if (panelAdded && volNum != null) {
+                volNum.setText(String.valueOf(raw));
+                eqBar.setBarValue(barVal);
+                eqBar.setBallColor(color);
+                boolean showNudge = raw >= EqBarView.DRAG_CAP && raw < WIDGET_MAX;
+                nudgeBtn.setVisibility(showNudge ? View.VISIBLE : View.INVISIBLE);
+                collapseBtn.setRotation("right".equals(side) ? 90f : -90f);
+                if (themePopup.getVisibility() == View.VISIBLE) refreshThemeGridSelection();
+            }
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "refreshVisuals failed", e);
         }
     }
 

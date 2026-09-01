@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.006
+- Added an on-device crash reporter, since there's no adb on the target head units: any crash, anywhere in the app, now gets written to a file and shown in a dialog the next time the app is opened - readable and screenshottable instead of an invisible "it stopped."
+- Wrapped every remaining touch handler, click listener, and drag callback in the floating tab/panel (drag, tap, long-press-close, the EQ bar's drag, the nudge arrow, the theme popup) so a failure anywhere in there logs and recovers instead of crashing.
+- Fixed a real crash risk in the EQ bar's drawing code: it could ask for a gradient over a zero-height area before its first layout pass, which throws.
+
 ## 1.005
 - On launch, a missing-permissions dialog now lists exactly what's needed and why ("Display over other apps - lets the floating volume tab draw on top of everything else", etc.) with a "Grant now" button, instead of silently jumping to Settings or only showing a toast.
 
