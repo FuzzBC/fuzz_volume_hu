@@ -119,18 +119,25 @@ public class VolumeOverlayService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        prefs = new Prefs(this);
-        themedCtx = new ContextThemeWrapper(this, R.style.AppTheme);
-        mainHandler = new Handler(Looper.getMainLooper());
-        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-
-        side = prefs.getSide();
-        vpos = prefs.getVpos();
-        themeIndex = prefs.getTheme();
-
+        // The WHOLE method is inside one try/catch now, not just the back
+        // half - VolumeOverlayService.start() in MainActivity only guards
+        // the *request* to start (startForegroundService() returning), not
+        // what happens once the OS actually dispatches onCreate() here a
+        // moment later - that dispatch runs outside any try/catch a caller
+        // could wrap around start(). Everything that can fail must be caught
+        // in here, not out there.
         try {
+            wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            prefs = new Prefs(this);
+            themedCtx = new ContextThemeWrapper(this, R.style.AppTheme);
+            mainHandler = new Handler(Looper.getMainLooper());
+            touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+
+            side = prefs.getSide();
+            vpos = prefs.getVpos();
+            themeIndex = prefs.getTheme();
+
             createNotificationChannel();
             startForeground(NOTIF_ID, buildNotification());
             prefs.setOverlayStarted(true);
@@ -139,12 +146,15 @@ public class VolumeOverlayService extends Service {
             buildTabView();
             addTabWindow();
             refreshVisuals();
-        } catch (Exception e) {
-            // Never let a WindowManager/notification quirk on unusual firmware
-            // crash the whole process - stop cleanly instead, MainActivity's
-            // status text just shows "stopped" and the user can retry.
-            android.util.Log.e("VolumeOverlayService", "startup failed, stopping", e);
-            prefs.setOverlayStarted(false);
+        } catch (Throwable t) {
+            // Throwable, not Exception: on unusual firmware a class-loading
+            // or resource problem can surface as an Error, which a plain
+            // catch (Exception) does not catch - and an uncaught one here
+            // takes the whole process down, MainActivity included, since
+            // they share a process. Never let a WindowManager/notification/
+            // resource quirk do that - stop cleanly instead.
+            android.util.Log.e("VolumeOverlayService", "startup failed, stopping", t);
+            try { if (prefs != null) prefs.setOverlayStarted(false); } catch (Exception ignored) {}
             stopSelf();
         }
     }

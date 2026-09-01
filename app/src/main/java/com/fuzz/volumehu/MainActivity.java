@@ -214,24 +214,11 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         refreshStatus();
-        if (justShowedCrash) {
-            // A crash just happened - land on the plain main screen with the
-            // error and nothing else, never straight back into whatever just
-            // crashed. Starting it again is a deliberate "Start volume
-            // overlay" tap from here on.
-            justShowedCrash = false;
-            return;
-        }
-        // Otherwise, opening the app is also the simplest way to (re)launch
-        // the overlay if it isn't running and permission is already granted.
-        try {
-            if (canDrawOverlays() && !prefs.wasOverlayStarted()) {
-                VolumeOverlayService.start(this);
-                refreshStatus();
-            }
-        } catch (Exception e) {
-            android.util.Log.e("MainActivity", "auto-start on resume failed", e);
-        }
+        justShowedCrash = false;
+        // Starting the overlay is a deliberate "Start volume overlay" tap
+        // now, not something that happens automatically on every launch -
+        // that auto-start was itself a repeated, hard-to-diagnose crash
+        // trigger. Opening this screen is always just this screen.
     }
 
     private boolean canDrawOverlays() {

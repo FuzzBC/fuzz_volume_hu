@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.008
+- Found another real gap: VolumeOverlayService.onCreate() only wrapped its second half in try/catch - the first few lines (WindowManager/AudioManager/prefs/theme setup) ran unguarded, and since starting the service is asynchronous, nothing MainActivity does can catch a failure there. The whole method is wrapped now, and it catches Throwable (not just Exception), since a resource or class-loading problem on unusual firmware can surface as an Error that a plain Exception catch lets straight through.
+- Removed the automatic "start the overlay when the app opens" behavior entirely - it was itself a repeated, hard-to-pin-down crash trigger, firing on every single app open. Opening the app is now always just the main screen; starting the overlay is a deliberate tap on "Start volume overlay" so a problem there can actually be isolated and reported instead of racing with a crash-recovery dialog.
+
 ## 1.007
 - Found the actual cause of "still crashes, never starts": VolumeOverlayService returned START_STICKY, which tells Android to relaunch it automatically the instant it's killed - including by a crash. If startup crashes for any reason, the OS itself keeps relaunching it in an infinite loop that no try/catch inside the app could ever stop. Changed to START_NOT_STICKY - a fresh start now only ever comes from an explicit source (opening the app, the boot receiver).
 - After a crash, opening the app now only shows the error - it no longer auto-restarts the overlay. Starting it again is a deliberate tap on "Start volume overlay".
