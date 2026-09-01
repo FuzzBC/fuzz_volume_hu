@@ -16,6 +16,14 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Asking the OS to stop killing the service under Doze/App Standby. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Optional: lets TraceLog write to the root of shared storage
+         (a plain /storage/emulated/0/fuzz_volume_trace.log) instead of the
+         app's own Android/data folder, so it's visible to any file manager
+         with no special per-folder access needed. Entirely optional - the
+         trace log still works without it, just from a less convenient
+         location. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <application
         android:name=".FuzzVolumeApp"

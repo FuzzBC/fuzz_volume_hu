@@ -35,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private Button grantOverlayBtn;
     private Button toggleServiceBtn;
     private Button batteryOptBtn;
+    private Button storageAccessBtn;
     private Prefs prefs;
     // Set when this launch is showing a just-happened crash - onResume then
     // skips its usual auto-start-the-overlay so a crash always lands on the
@@ -76,6 +77,8 @@ public class MainActivity extends AppCompatActivity {
         Button checkUpdateBtn = findViewById(R.id.checkUpdateBtn);
         Button viewTraceBtn = findViewById(R.id.viewTraceBtn);
         viewTraceBtn.setOnClickListener(v -> showTraceLog());
+        storageAccessBtn = findViewById(R.id.storageAccessBtn);
+        storageAccessBtn.setOnClickListener(v -> requestMainStorageAccess());
         TraceLog.step(this, "views found, listeners about to be wired");
 
         grantOverlayBtn.setOnClickListener(v -> openOverlaySettings(true));
@@ -238,6 +241,36 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Opens the "all files access" screen so TraceLog can write to the root
+     * of shared storage (a plain fuzz_volume_trace.log any file manager can
+     * see, no per-app folder or extra permission needed to browse to it)
+     * instead of the app's own Android/data folder. Entirely optional - the
+     * trace log works either way - so this is a deliberate button tap, never
+     * announced or requested automatically.
+     */
+    private void requestMainStorageAccess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Toast.makeText(this, "Not needed on this Android version - the log already writes to a plain shared-storage location.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (TraceLog.isOnMainStorage(this)) {
+            Toast.makeText(this, "Already granted - log is at " + TraceLog.logFile(this).getAbsolutePath(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        Intent scoped = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+        boolean opened = safeStartActivity(scoped);
+        if (!opened) {
+            opened = safeStartActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+        }
+        if (opened) {
+            Toast.makeText(this, "Turn on \"Allow access to manage all files\" for FuZz Volume HU, then come back.", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "This device doesn't support that screen - the log stays in its current location, which still works fine.", Toast.LENGTH_LONG).show();
+        }
+    }
+
     /** Starts an Activity, swallowing any failure (unresolvable Intent, missing
      *  screen on this firmware, etc.) instead of letting it crash the app. */
     private boolean safeStartActivity(Intent intent) {
@@ -271,9 +304,12 @@ public class MainActivity extends AppCompatActivity {
         boolean running = prefs.wasOverlayStarted();
         grantOverlayBtn.setEnabled(!overlayOk);
         toggleServiceBtn.setText(running ? R.string.stop_overlay : R.string.start_overlay);
-        statusText.setText(overlayOk
+        boolean onMainStorage = TraceLog.isOnMainStorage(this);
+        storageAccessBtn.setEnabled(!onMainStorage);
+        statusText.setText((overlayOk
                 ? (running ? "Overlay permission granted - widget running" : "Overlay permission granted - widget stopped")
-                : "Overlay permission not granted yet");
+                : "Overlay permission not granted yet")
+                + "\nLog: " + TraceLog.logFile(this).getAbsolutePath());
     }
 
     private void checkForUpdate(boolean showUpToDateToast) {

@@ -58,6 +58,13 @@
         android:id="@+id/viewTraceBtn"
         android:layout_width="260dp"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
         android:text="@string/view_trace_log" />
+
+    <Button
+        android:id="@+id/storageAccessBtn"
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:text="@string/storage_access" />
 
 </LinearLayout>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.010
+- Added an optional "Store log on main storage" button - grants "all files access" so the trace log writes to a plain /storage/emulated/0/fuzz_volume_trace.log instead of the app's own Android/data folder, visible to any file manager with no special per-folder permission needed. Entirely optional; the log keeps working from its previous location either way.
+- The main screen now shows the log's exact current path directly under the status line.
+
 ## 1.009
 - Added a persistent, step-by-step trace log (TraceLog), separate from the crash dialog: every meaningful step through startup (both MainActivity's and VolumeOverlayService's) is appended to a file as it happens, not just written once when something finally throws. Written to external storage - Android/data/com.fuzz.volumehu/files/fuzz_volume_trace.log - so it can be read with any file manager even if the app never manages to show its own UI.
 - Added a "View trace log" button on the main screen to read it in-app too, with a Clear button to reset it.

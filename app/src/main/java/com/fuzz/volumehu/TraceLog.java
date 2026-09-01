@@ -1,6 +1,8 @@
 package com.fuzz.volumehu;
 
 import android.content.Context;
+import android.os.Build;
+import android.os.Environment;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -63,8 +65,22 @@ public final class TraceLog {
         }
     }
 
-    /** Where the log actually lives - shown in the UI so it can be found with a file manager. */
+    /**
+     * Where the log actually lives - shown in the UI so it can be found with
+     * a file manager. Prefers the root of shared storage (a plain
+     * /storage/emulated/0/fuzz_volume_trace.log any file manager can see
+     * without digging into a per-app folder) when "all files access" has
+     * been granted; otherwise the app's own external-files folder; and
+     * app-private storage as the last resort if neither is available.
+     */
     public static File logFile(Context ctx) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                if (Environment.isExternalStorageManager()) {
+                    return new File(Environment.getExternalStorageDirectory(), FILE_NAME);
+                }
+            } catch (Throwable ignored) {}
+        }
         File dir;
         try {
             dir = ctx.getExternalFilesDir(null);
@@ -77,10 +93,33 @@ public final class TraceLog {
         return new File(dir, FILE_NAME);
     }
 
-    /** Reads the whole trace log as text, or null if there isn't one yet. */
+    /** True once "all files access" is granted and the log is writing to shared storage's root. */
+    public static boolean isOnMainStorage(Context ctx) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false;
+        try {
+            return Environment.isExternalStorageManager();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Reads the whole trace log as text, or null if there isn't one yet.
+     * Checks the current preferred location first, then falls back to the
+     * app's external-files folder - relevant right after "all files access"
+     * is freshly granted, when older entries are still sitting in the old
+     * location and nothing's been logged to the new one yet.
+     */
     public static String readAll(Context ctx) {
-        File f = logFile(ctx);
-        if (!f.exists()) return null;
+        String primary = readFile(logFile(ctx));
+        if (primary != null) return primary;
+        File fallbackDir = ctx.getExternalFilesDir(null);
+        if (fallbackDir != null) return readFile(new File(fallbackDir, FILE_NAME));
+        return null;
+    }
+
+    private static String readFile(File f) {
+        if (f == null || !f.exists()) return null;
         StringBuilder sb = new StringBuilder();
         try (BufferedReader r = new BufferedReader(new FileReader(f))) {
             String line;
@@ -88,6 +127,6 @@ public final class TraceLog {
         } catch (Exception e) {
             return null;
         }
-        return sb.toString();
+        return sb.length() == 0 ? null : sb.toString();
     }
 }
