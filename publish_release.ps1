@@ -45,11 +45,23 @@ if (Test-Path $changelogPath) {
         if ($entryLines.Count -gt 0) { $releaseNotes = ($entryLines -join "`n") }
     }
 }
+# Get-Content -Encoding UTF8 can leave a leading BOM character on the first
+# line it reads - strip it so it doesn't show up as a stray glyph in the
+# published release body.
+$releaseNotes = $releaseNotes.TrimStart([char]0xFEFF)
 
 Write-Output "Publishing $tag (versionName $versionName) to $owner/$repo ..."
 
-$existing = gh release view $tag --repo "$owner/$repo" 2>$null
-if ($LASTEXITCODE -eq 0) {
+# gh writes "release not found" to stderr with a non-zero exit when the tag
+# doesn't exist yet (the expected/normal case here) - PowerShell 5.1 turns
+# that into a terminating NativeCommandError under $ErrorActionPreference
+# 'Stop' even with 2>$null, so it's relaxed to 'Continue' for just this probe.
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+gh release view $tag --repo "$owner/$repo" *> $null
+$releaseExists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prevEAP
+if ($releaseExists) {
     Write-Output "Release $tag already exists - not creating a duplicate."
     exit 0
 }
