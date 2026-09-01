@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.005
+- On launch, a missing-permissions dialog now lists exactly what's needed and why ("Display over other apps - lets the floating volume tab draw on top of everything else", etc.) with a "Grant now" button, instead of silently jumping to Settings or only showing a toast.
+
 ## 1.004
 - Extra hardening: starting/stopping the overlay service (on launch, and from the "Start/Stop volume overlay" button) is now also wrapped so any unexpected failure shows a toast instead of crashing.
 

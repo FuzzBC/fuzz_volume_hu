@@ -88,25 +88,53 @@ public class MainActivity extends AppCompatActivity {
         // Silent check on every launch; only nags with a dialog if something's newer.
         checkForUpdate(false);
 
-        // SYSTEM_ALERT_WINDOW has no system Allow/Deny popup - the only way to
-        // grant it is the Settings screen below, so a fresh install is taken
-        // there automatically instead of waiting for someone to notice the
-        // "Grant permission" button. POST_NOTIFICATIONS (13+) does have a real
-        // popup, requested here too so the ongoing notification actually shows.
-        // Everything here is wrapped defensively: some head-unit firmware ships
-        // without the usual Settings screens for these, and an unresolvable
-        // Intent must never be allowed to crash the app on launch.
+        // Announce anything missing with an actual dialog instead of silently
+        // jumping to Settings or just toasting - wrapped defensively, same
+        // reasoning as everywhere else here: this must never crash the app.
         try {
-            requestNeededPermissions();
+            showMissingPermissionsDialog();
         } catch (Exception e) {
-            android.util.Log.w("MainActivity", "requestNeededPermissions failed", e);
+            android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
         }
     }
 
+    private boolean notificationsGranted() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                        == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Builds the list of what's actually missing and, if there's anything,
+     * announces it in a dialog before touching Settings or the system
+     * notification prompt - so the user always sees *why* before anything
+     * happens, rather than a screen just appearing (or a toast that's easy
+     * to miss on a head unit's small status bar).
+     */
+    private void showMissingPermissionsDialog() {
+        java.util.List<String> missing = new java.util.ArrayList<>();
+        if (!canDrawOverlays()) {
+            missing.add("Display over other apps - lets the floating volume tab draw on top of everything else");
+        }
+        if (!notificationsGranted()) {
+            missing.add("Notifications - shows the ongoing status notification that keeps the overlay running");
+        }
+        if (missing.isEmpty()) return;
+
+        StringBuilder msg = new StringBuilder("FuZz Volume HU needs:\n");
+        for (String line : missing) msg.append("\n- ").append(line);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Permissions needed")
+                .setMessage(msg.toString())
+                .setCancelable(true)
+                .setPositiveButton("Grant now", (d, w) -> requestNeededPermissions())
+                .setNegativeButton("Not now", null)
+                .show();
+    }
+
     private void requestNeededPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) {
+        if (!notificationsGranted()) {
             try {
                 ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
             } catch (Exception e) {
