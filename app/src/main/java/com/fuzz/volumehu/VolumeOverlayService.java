@@ -151,7 +151,15 @@ public class VolumeOverlayService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY;
+        // NOT START_STICKY on purpose: that tells the OS to relaunch this
+        // service on its own the moment it's killed - including by a crash.
+        // If startup crashes for any reason, that turns into an infinite
+        // restart-crash loop with no way for the user (or MainActivity) to
+        // ever get in front of it. A fresh start now always comes from an
+        // explicit source instead - MainActivity, BootReceiver - each of
+        // which checks Prefs.wasOverlayStarted() and backs off after a crash
+        // (see FuzzVolumeApp).
+        return START_NOT_STICKY;
     }
 
     @Override

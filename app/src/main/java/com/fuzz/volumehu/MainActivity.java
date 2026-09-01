@@ -36,6 +36,11 @@ public class MainActivity extends AppCompatActivity {
     private Button toggleServiceBtn;
     private Button batteryOptBtn;
     private Prefs prefs;
+    // Set when this launch is showing a just-happened crash - onResume then
+    // skips its usual auto-start-the-overlay so a crash always lands on the
+    // plain main screen with the error, never straight back into whatever
+    // just crashed. Cleared after being consumed once.
+    private boolean justShowedCrash = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -49,9 +54,11 @@ public class MainActivity extends AppCompatActivity {
         try {
             String crash = FuzzVolumeApp.takeLastCrash(this);
             if (crash != null) {
+                justShowedCrash = true;
                 new AlertDialog.Builder(this)
                         .setTitle("FuZz Volume HU crashed last time")
                         .setMessage(crash)
+                        .setCancelable(false)
                         .setPositiveButton("OK", null)
                         .show();
             }
@@ -107,10 +114,14 @@ public class MainActivity extends AppCompatActivity {
         // Announce anything missing with an actual dialog instead of silently
         // jumping to Settings or just toasting - wrapped defensively, same
         // reasoning as everywhere else here: this must never crash the app.
-        try {
-            showMissingPermissionsDialog();
-        } catch (Exception e) {
-            android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
+        // Skipped right after a crash so it isn't stacked on top of that
+        // dialog - it'll ask again next launch if still relevant.
+        if (!justShowedCrash) {
+            try {
+                showMissingPermissionsDialog();
+            } catch (Exception e) {
+                android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
+            }
         }
     }
 
@@ -203,8 +214,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         refreshStatus();
-        // Opening the app is also the simplest way to (re)launch the overlay
-        // if it isn't running and permission is already granted.
+        if (justShowedCrash) {
+            // A crash just happened - land on the plain main screen with the
+            // error and nothing else, never straight back into whatever just
+            // crashed. Starting it again is a deliberate "Start volume
+            // overlay" tap from here on.
+            justShowedCrash = false;
+            return;
+        }
+        // Otherwise, opening the app is also the simplest way to (re)launch
+        // the overlay if it isn't running and permission is already granted.
         try {
             if (canDrawOverlays() && !prefs.wasOverlayStarted()) {
                 VolumeOverlayService.start(this);

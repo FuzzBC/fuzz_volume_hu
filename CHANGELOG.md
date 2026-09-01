@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.007
+- Found the actual cause of "still crashes, never starts": VolumeOverlayService returned START_STICKY, which tells Android to relaunch it automatically the instant it's killed - including by a crash. If startup crashes for any reason, the OS itself keeps relaunching it in an infinite loop that no try/catch inside the app could ever stop. Changed to START_NOT_STICKY - a fresh start now only ever comes from an explicit source (opening the app, the boot receiver).
+- After a crash, opening the app now only shows the error - it no longer auto-restarts the overlay. Starting it again is a deliberate tap on "Start volume overlay".
+
 ## 1.006
 - Added an on-device crash reporter, since there's no adb on the target head units: any crash, anywhere in the app, now gets written to a file and shown in a dialog the next time the app is opened - readable and screenshottable instead of an invisible "it stopped."
 - Wrapped every remaining touch handler, click listener, and drag callback in the floating tab/panel (drag, tap, long-press-close, the EQ bar's drag, the nudge arrow, the theme popup) so a failure anywhere in there logs and recovers instead of crashing.

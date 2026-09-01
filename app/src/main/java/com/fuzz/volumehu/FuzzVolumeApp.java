@@ -36,6 +36,12 @@ public class FuzzVolumeApp extends Application {
             } catch (Exception ignored) {
                 // Writing the crash log must never itself throw and mask the real crash.
             }
+            try {
+                // A crash doesn't reliably run VolumeOverlayService.onDestroy(), so this
+                // flag can't be trusted to have been cleared there - clear it here too,
+                // otherwise MainActivity thinks the (now-dead) overlay is still running.
+                new Prefs(this).setOverlayStarted(false);
+            } catch (Exception ignored) {}
             if (platformHandler != null) {
                 platformHandler.uncaughtException(thread, ex);
             } else {
