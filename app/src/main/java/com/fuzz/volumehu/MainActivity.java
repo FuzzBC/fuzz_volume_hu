@@ -1,6 +1,7 @@
 package com.fuzz.volumehu;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -13,6 +14,8 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 /**
  * File:        MainActivity.java
@@ -25,6 +28,8 @@ import androidx.appcompat.app.AppCompatActivity;
  * Date:        2026-09-01
  */
 public class MainActivity extends AppCompatActivity {
+
+    private static final int REQ_NOTIF = 501;
 
     private TextView statusText;
     private Button grantOverlayBtn;
@@ -79,6 +84,26 @@ public class MainActivity extends AppCompatActivity {
 
         // Silent check on every launch; only nags with a dialog if something's newer.
         checkForUpdate(false);
+
+        // SYSTEM_ALERT_WINDOW has no system Allow/Deny popup - the only way to
+        // grant it is the Settings screen below, so a fresh install is taken
+        // there automatically instead of waiting for someone to notice the
+        // "Grant permission" button. POST_NOTIFICATIONS (13+) does have a real
+        // popup, requested here too so the ongoing notification actually shows.
+        requestNeededPermissions();
+    }
+
+    private void requestNeededPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+        }
+        if (!canDrawOverlays()) {
+            Toast.makeText(this, R.string.overlay_perm_needed, Toast.LENGTH_LONG).show();
+            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())));
+        }
     }
 
     @Override
