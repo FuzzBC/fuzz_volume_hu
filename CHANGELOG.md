@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.004
+- Extra hardening: starting/stopping the overlay service (on launch, and from the "Start/Stop volume overlay" button) is now also wrapped so any unexpected failure shows a toast instead of crashing.
+
 ## 1.003
 - Fixed a crash-on-launch: v1.002's auto-prompt for overlay permission called startActivity() on the system's "display over other apps" screen with no safety net. On head-unit firmware that doesn't ship that exact screen, that throws and force-closes the app before any permission dialog can show. Every settings/browser Intent the app opens (overlay permission, battery optimization exemption, update download) is now wrapped so a missing screen shows a message instead of crashing, and falls back to a version of the Intent without the package-specific URI if the first form isn't supported.
 - Hardened VolumeOverlayService the same way: adding/removing the floating windows can no longer crash the app if something about WindowManager behaves unexpectedly on this firmware - it logs and stops cleanly instead.

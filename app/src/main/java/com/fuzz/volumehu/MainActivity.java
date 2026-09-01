@@ -52,14 +52,19 @@ public class MainActivity extends AppCompatActivity {
         grantOverlayBtn.setOnClickListener(v -> openOverlaySettings(true));
 
         toggleServiceBtn.setOnClickListener(v -> {
-            if (prefs.wasOverlayStarted()) {
-                VolumeOverlayService.stop(this);
-            } else {
-                if (!canDrawOverlays()) {
-                    Toast.makeText(this, R.string.overlay_perm_needed, Toast.LENGTH_LONG).show();
-                    return;
+            try {
+                if (prefs.wasOverlayStarted()) {
+                    VolumeOverlayService.stop(this);
+                } else {
+                    if (!canDrawOverlays()) {
+                        Toast.makeText(this, R.string.overlay_perm_needed, Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    VolumeOverlayService.start(this);
                 }
-                VolumeOverlayService.start(this);
+            } catch (Exception e) {
+                android.util.Log.e("MainActivity", "toggle overlay failed", e);
+                Toast.makeText(this, "Couldn't start the overlay - see logs.", Toast.LENGTH_LONG).show();
             }
             refreshStatus();
         });
@@ -156,9 +161,13 @@ public class MainActivity extends AppCompatActivity {
         refreshStatus();
         // Opening the app is also the simplest way to (re)launch the overlay
         // if it isn't running and permission is already granted.
-        if (canDrawOverlays() && !prefs.wasOverlayStarted()) {
-            VolumeOverlayService.start(this);
-            refreshStatus();
+        try {
+            if (canDrawOverlays() && !prefs.wasOverlayStarted()) {
+                VolumeOverlayService.start(this);
+                refreshStatus();
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "auto-start on resume failed", e);
         }
     }
 
