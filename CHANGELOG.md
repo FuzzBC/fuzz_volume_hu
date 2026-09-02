@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.028
+- New "Block system volume popup" button on the main screen (off by default). When on, the hardware volume buttons no longer bring up Android's own volume popup at all - a new VolumeKeyAccessibilityService intercepts them directly and applies the change itself, silently. Whenever the volume changes this way (or from anywhere else), the panel now opens for 2 seconds if it wasn't already showing, then closes itself back to the bubble - Android's own popup, replaced. Turning the button on the first time walks you to Android's own Accessibility settings to grant it (a separate, more sensitive permission from overlay/notifications) - turning it back off never needs that screen again. A real interaction with the panel while it's peeking (dragging, nudging, holding) cancels the auto-close instead of yanking it away mid-use.
+
 ## 1.027
 - New "LEDCAR Set" checkbox on the Theme tab: mirrors whatever color is currently set in FuZz LEDCAR, overriding the theme entirely once one arrives. Needs FuZz LEDCAR v1.036+ (it now announces its color to other FuZz apps whenever you pick one - swatch, RGB dialog, or the color wheel).
 

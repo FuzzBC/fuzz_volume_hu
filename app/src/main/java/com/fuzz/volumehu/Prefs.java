@@ -36,6 +36,7 @@ public class Prefs {
     private static final String KEY_THEME = "theme";          // index into ThemeColors.THEMES
     private static final String KEY_OVERLAY_STARTED = "overlay_started"; // was the overlay running when the app was last used
     private static final String KEY_STORAGE_SETUP_DONE = "storage_setup_done"; // asked about (or skipped) the main-storage log location once already
+    private static final String KEY_BLOCK_NATIVE_VOLUME_UI = "block_native_volume_ui"; // main-screen toggle - see VolumeKeyAccessibilityService
 
     // Theme tab
     private static final String KEY_DYNAMIC_COLOR = "dynamic_color"; // true: color follows volume (theme color -> red at max); false: flat theme color everywhere ("merge")
@@ -88,6 +89,13 @@ public class Prefs {
 
     public boolean isStorageSetupDone() { return sp.getBoolean(KEY_STORAGE_SETUP_DONE, false); }
     public void setStorageSetupDone(boolean done) { sp.edit().putBoolean(KEY_STORAGE_SETUP_DONE, done).commit(); }
+
+    /** Main-screen "Block system volume popup" toggle - off by default.
+     *  Read fresh (not cached) by VolumeKeyAccessibilityService on every
+     *  key press and by VolumeOverlayService's peek logic, so toggling
+     *  this takes effect immediately. */
+    public boolean isBlockNativeVolumeUi() { return sp.getBoolean(KEY_BLOCK_NATIVE_VOLUME_UI, false); }
+    public void setBlockNativeVolumeUi(boolean enabled) { sp.edit().putBoolean(KEY_BLOCK_NATIVE_VOLUME_UI, enabled).commit(); }
 
     public boolean isDynamicColor() { return sp.getBoolean(KEY_DYNAMIC_COLOR, true); }
     public void setDynamicColor(boolean dynamic) { sp.edit().putBoolean(KEY_DYNAMIC_COLOR, dynamic).commit(); }

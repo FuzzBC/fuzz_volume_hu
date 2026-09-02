@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private Button grantOverlayBtn;
     private Button toggleServiceBtn;
     private Button batteryOptBtn;
+    private Button blockVolumeBtn;
     private Prefs prefs;
     private UpdateInstaller updateInstaller; // lazily-created APK download/install helper
     // Set when this launch is showing a just-happened crash - onResume then
@@ -80,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
         grantOverlayBtn = findViewById(R.id.grantOverlayBtn);
         toggleServiceBtn = findViewById(R.id.toggleServiceBtn);
         batteryOptBtn = findViewById(R.id.batteryOptBtn);
+        blockVolumeBtn = findViewById(R.id.blockVolumeBtn);
         Button checkUpdateBtn = findViewById(R.id.checkUpdateBtn);
         Button viewTraceBtn = findViewById(R.id.viewTraceBtn);
         viewTraceBtn.setOnClickListener(v -> showTraceLog());
@@ -120,6 +122,8 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Already exempt.", Toast.LENGTH_SHORT).show();
             }
         });
+
+        blockVolumeBtn.setOnClickListener(v -> toggleBlockNativeVolumeUi());
 
         checkUpdateBtn.setOnClickListener(v -> checkForUpdate(true));
 
@@ -305,14 +309,64 @@ public class MainActivity extends AppCompatActivity {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this);
     }
 
+    /**
+     * "Block system volume popup": turning it ON needs
+     * VolumeKeyAccessibilityService actually enabled under Android's own
+     * Accessibility settings first - an app cannot enable that for itself,
+     * only guide the user there. Turning it OFF never needs that check;
+     * VolumeKeyAccessibilityService reads this same flag fresh on every key
+     * press, so switching off here takes effect immediately even if
+     * Accessibility access is left granted.
+     */
+    private void toggleBlockNativeVolumeUi() {
+        boolean currentlyOn = prefs.isBlockNativeVolumeUi();
+        if (currentlyOn) {
+            prefs.setBlockNativeVolumeUi(false);
+            Toast.makeText(this, "System volume popup restored", Toast.LENGTH_SHORT).show();
+            refreshStatus();
+            return;
+        }
+        if (!isVolumeKeyServiceEnabled()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Accessibility access needed")
+                    .setMessage("Taking over the volume buttons needs Accessibility access. On the next screen, find FuZz Volume HU (under Installed apps / Downloaded apps) and turn it on, then come back here and tap this button again.")
+                    .setPositiveButton("Open Accessibility settings", (d, w) ->
+                            safeStartActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+        prefs.setBlockNativeVolumeUi(true);
+        Toast.makeText(this, "System volume popup blocked - use the FuZz bubble instead", Toast.LENGTH_LONG).show();
+        refreshStatus();
+    }
+
+    private boolean isVolumeKeyServiceEnabled() {
+        try {
+            String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (enabled == null || enabled.isEmpty()) return false;
+            String target = getPackageName() + "/" + VolumeKeyAccessibilityService.class.getName();
+            for (String s : enabled.split(":")) {
+                if (s.equalsIgnoreCase(target)) return true;
+            }
+            return false;
+        } catch (Exception e) {
+            android.util.Log.w("MainActivity", "isVolumeKeyServiceEnabled check failed", e);
+            return false;
+        }
+    }
+
     private void refreshStatus() {
         boolean overlayOk = canDrawOverlays();
         boolean running = prefs.wasOverlayStarted();
         grantOverlayBtn.setEnabled(!overlayOk);
         toggleServiceBtn.setText(running ? R.string.stop_overlay : R.string.start_overlay);
+        boolean blocking = prefs.isBlockNativeVolumeUi();
+        blockVolumeBtn.setText(blocking ? R.string.block_volume_popup_on : R.string.block_volume_popup_off);
         statusText.setText((overlayOk
                 ? (running ? "Overlay permission granted - widget running" : "Overlay permission granted - widget stopped")
                 : "Overlay permission not granted yet")
+                + (blocking ? "\nSystem volume popup: blocked" : "")
                 + "\nLog: " + TraceLog.logFile(this).getAbsolutePath());
     }
 
