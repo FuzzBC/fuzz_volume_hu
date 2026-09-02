@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.020
+- Removed the "hold 2s for custom" hint text under the volume readout entirely - the hold-to-open gesture is still exactly 2s, just silent now; the thin progress line is still the only feedback while holding.
+- The Size tab's first slider now resizes the floating bubble itself (was: the settings popup's own size, which is fixed at 260dp now) - its height and icon scale together with it.
+- The bubble's icon is a little larger relative to the bubble than before.
+
 ## 1.019
 - Fixed: the Size tab's "volume panel width" slider didn't actually resize the panel - positionPanel() re-measured the panel's content internally but never resized the overlay window itself, so the on-screen panel stayed whatever width it was when first opened. It now resizes for real.
 - "Max volume supported" (Conf tab) can now go as low as 10 (was 25).

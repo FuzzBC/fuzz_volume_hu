@@ -12,8 +12,8 @@
 
     <ImageView
         android:id="@+id/tabIcon"
-        android:layout_width="17.6dp"
-        android:layout_height="17.6dp"
+        android:layout_width="20.8dp"
+        android:layout_height="20.8dp"
         android:layout_gravity="center"
         android:src="@drawable/ic_speaker"
         android:contentDescription="@string/app_name" />

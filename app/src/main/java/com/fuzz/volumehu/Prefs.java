@@ -30,7 +30,7 @@ public class Prefs {
     private static final String KEY_DYNAMIC_COLOR = "dynamic_color"; // true: color follows volume (theme color -> red at max); false: flat theme color everywhere ("merge")
 
     // Size tab (all dp)
-    private static final String KEY_POPUP_DIAMETER = "popup_diameter_dp";
+    private static final String KEY_BUBBLE_WIDTH = "bubble_width_dp"; // floating bubble's own size - height/icon scale with it
     private static final String KEY_PANEL_WIDTH = "panel_width_dp";
     private static final String KEY_PANEL_BAR_HEIGHT = "panel_bar_height_dp";
 
@@ -43,7 +43,7 @@ public class Prefs {
     private static final String KEY_POPUP_X = "popup_x";
     private static final String KEY_POPUP_Y = "popup_y";
 
-    public static final int DEFAULT_POPUP_DIAMETER_DP = 260;
+    public static final int DEFAULT_BUBBLE_WIDTH_DP = 52;
     public static final int DEFAULT_PANEL_WIDTH_DP = 150;
     public static final int DEFAULT_PANEL_BAR_HEIGHT_DP = 150;
     public static final int DEFAULT_MAX_VOLUME_SUPPORTED = 40;
@@ -74,8 +74,8 @@ public class Prefs {
     public boolean isDynamicColor() { return sp.getBoolean(KEY_DYNAMIC_COLOR, true); }
     public void setDynamicColor(boolean dynamic) { sp.edit().putBoolean(KEY_DYNAMIC_COLOR, dynamic).apply(); }
 
-    public int getPopupDiameterDp() { return sp.getInt(KEY_POPUP_DIAMETER, DEFAULT_POPUP_DIAMETER_DP); }
-    public void setPopupDiameterDp(int dp) { sp.edit().putInt(KEY_POPUP_DIAMETER, dp).apply(); }
+    public int getBubbleWidthDp() { return sp.getInt(KEY_BUBBLE_WIDTH, DEFAULT_BUBBLE_WIDTH_DP); }
+    public void setBubbleWidthDp(int dp) { sp.edit().putInt(KEY_BUBBLE_WIDTH, dp).apply(); }
 
     public int getPanelWidthDp() { return sp.getInt(KEY_PANEL_WIDTH, DEFAULT_PANEL_WIDTH_DP); }
     public void setPanelWidthDp(int dp) { sp.edit().putInt(KEY_PANEL_WIDTH, dp).apply(); }

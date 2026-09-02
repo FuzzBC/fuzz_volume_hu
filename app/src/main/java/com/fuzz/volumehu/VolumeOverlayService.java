@@ -74,9 +74,19 @@ public class VolumeOverlayService extends Service {
     private static final long NUDGE_COOLDOWN_MS = 500;
 
     // Size tab slider ranges (dp) - min value + seekbar's 0-based progress.
-    private static final int POPUP_DIAMETER_MIN_DP = 180, POPUP_DIAMETER_MAX_DP = 340;
+    private static final int BUBBLE_WIDTH_MIN_DP = 36, BUBBLE_WIDTH_MAX_DP = 90;
     private static final int PANEL_WIDTH_MIN_DP = 110, PANEL_WIDTH_MAX_DP = 260;
     private static final int PANEL_BAR_HEIGHT_MIN_DP = 90, PANEL_BAR_HEIGHT_MAX_DP = 260;
+    // The floating bubble's original proportions (52x108dp) and icon size
+    // (see overlay_tab.xml history) as ratios, so resizing the bubble via
+    // the Size tab scales its height and icon together instead of just its
+    // width. TAB_ICON_RATIO is a little bigger than the bubble's original
+    // 22/52 icon-to-width ratio.
+    private static final float TAB_ASPECT = 108f / 52f;
+    private static final float TAB_ICON_RATIO = 0.40f; // was ~0.34 (17.6/52) - "a little larger"
+    // The settings popup card's own size is fixed - only the bubble and
+    // the volume panel are user-resizable (Size tab).
+    private static final int SETTINGS_POPUP_DIAMETER_DP = 260;
     // Conf tab slider range (volume units) for "max volume supported" - the
     // other two tiers ("limited to", "when go slowly") are bounded by
     // whichever tier sits directly above them instead of a fixed range.
@@ -101,7 +111,7 @@ public class VolumeOverlayService extends Service {
     private float vpos;
     private int themeIndex;
     private boolean dynamicColor;      // Theme tab: color follows volume vs. flat merge color
-    private int popupDiameterDp;       // Size tab
+    private int bubbleWidthDp;         // Size tab - floating bubble's own size (height/icon scale with it)
     private int panelWidthDp;          // Size tab
     private int panelBarHeightDp;      // Size tab
     private int maxVolumeSupported;    // Conf tab: EQ bar's full-scale top
@@ -147,8 +157,8 @@ public class VolumeOverlayService extends Service {
     private View themeTabContent, sizeTabContent, confTabContent;
 
     // Size tab
-    private TextView popupSizeLabel, panelWidthLabel, panelHeightLabel;
-    private SeekBar popupSizeSeek, panelWidthSeek, panelHeightSeek;
+    private TextView bubbleSizeLabel, panelWidthLabel, panelHeightLabel;
+    private SeekBar bubbleSizeSeek, panelWidthSeek, panelHeightSeek;
 
     // Conf tab
     private TextView confMaxLabel, confLimitLabel, confSlowLabel;
@@ -195,7 +205,7 @@ public class VolumeOverlayService extends Service {
             vpos = prefs.getVpos();
             themeIndex = prefs.getTheme();
             dynamicColor = prefs.isDynamicColor();
-            popupDiameterDp = prefs.getPopupDiameterDp();
+            bubbleWidthDp = prefs.getBubbleWidthDp();
             panelWidthDp = prefs.getPanelWidthDp();
             panelBarHeightDp = prefs.getPanelBarHeightDp();
             // Defensive clamp on load - Conf tab's tiers must stay ordered
@@ -335,10 +345,12 @@ public class VolumeOverlayService extends Service {
         return p;
     }
 
+    private int bubbleHeightDp() { return Math.round(bubbleWidthDp * TAB_ASPECT); }
+
     private void addTabWindow() {
         if (tabAdded) return;
         try {
-            tabParams = newOverlayParams(dp(52), dp(108));
+            tabParams = newOverlayParams(dp(bubbleWidthDp), dp(bubbleHeightDp()));
             positionTab();
             wm.addView(tabRoot, tabParams);
             tabAdded = true;
@@ -357,12 +369,14 @@ public class VolumeOverlayService extends Service {
 
     private void positionTab() {
         Point sz = screenSize();
-        int tabW = dp(52), tabH = dp(108);
+        int tabW = dp(bubbleWidthDp), tabH = dp(bubbleHeightDp());
         int x = "left".equals(side) ? 0 : sz.x - tabW;
         int y = Math.round((vpos / 100f) * sz.y - tabH / 2f);
         y = clampInt(y, 0, sz.y - tabH);
         tabParams.x = x;
         tabParams.y = y;
+        tabParams.width = tabW;   // Size tab's bubble-size slider needs the WINDOW itself resized (see positionPanel())
+        tabParams.height = tabH;
         if (tabAdded) wm.updateViewLayout(tabRoot, tabParams);
     }
 
@@ -525,10 +539,10 @@ public class VolumeOverlayService extends Service {
         sizeTabContent = themePopupRoot.findViewById(R.id.sizeTabContent);
         confTabContent = themePopupRoot.findViewById(R.id.confTabContent);
 
-        popupSizeLabel = themePopupRoot.findViewById(R.id.popupSizeLabel);
+        bubbleSizeLabel = themePopupRoot.findViewById(R.id.bubbleSizeLabel);
         panelWidthLabel = themePopupRoot.findViewById(R.id.panelWidthLabel);
         panelHeightLabel = themePopupRoot.findViewById(R.id.panelHeightLabel);
-        popupSizeSeek = themePopupRoot.findViewById(R.id.popupSizeSeek);
+        bubbleSizeSeek = themePopupRoot.findViewById(R.id.bubbleSizeSeek);
         panelWidthSeek = themePopupRoot.findViewById(R.id.panelWidthSeek);
         panelHeightSeek = themePopupRoot.findViewById(R.id.panelHeightSeek);
 
@@ -579,16 +593,16 @@ public class VolumeOverlayService extends Service {
     // ---------------------------------------------------------- Size tab
 
     private void wireSizeTab() {
-        popupSizeSeek.setMax(POPUP_DIAMETER_MAX_DP - POPUP_DIAMETER_MIN_DP);
+        bubbleSizeSeek.setMax(BUBBLE_WIDTH_MAX_DP - BUBBLE_WIDTH_MIN_DP);
         panelWidthSeek.setMax(PANEL_WIDTH_MAX_DP - PANEL_WIDTH_MIN_DP);
         panelHeightSeek.setMax(PANEL_BAR_HEIGHT_MAX_DP - PANEL_BAR_HEIGHT_MIN_DP);
         syncSizeTabUI();
 
-        onSeek(popupSizeSeek, v -> {
-            popupDiameterDp = POPUP_DIAMETER_MIN_DP + v;
-            prefs.setPopupDiameterDp(popupDiameterDp);
-            popupSizeLabel.setText("Popup size: " + popupDiameterDp + "dp");
-            applyPopupSizeLive();
+        onSeek(bubbleSizeSeek, v -> {
+            bubbleWidthDp = BUBBLE_WIDTH_MIN_DP + v;
+            prefs.setBubbleWidthDp(bubbleWidthDp);
+            bubbleSizeLabel.setText("Bubble size: " + bubbleWidthDp + "dp");
+            applyBubbleSizeLive();
         });
         onSeek(panelWidthSeek, v -> {
             panelWidthDp = PANEL_WIDTH_MIN_DP + v;
@@ -606,21 +620,24 @@ public class VolumeOverlayService extends Service {
     }
 
     private void syncSizeTabUI() {
-        popupSizeSeek.setProgress(popupDiameterDp - POPUP_DIAMETER_MIN_DP);
-        popupSizeLabel.setText("Popup size: " + popupDiameterDp + "dp");
+        bubbleSizeSeek.setProgress(bubbleWidthDp - BUBBLE_WIDTH_MIN_DP);
+        bubbleSizeLabel.setText("Bubble size: " + bubbleWidthDp + "dp");
         panelWidthSeek.setProgress(panelWidthDp - PANEL_WIDTH_MIN_DP);
         panelWidthLabel.setText("Volume panel width: " + panelWidthDp + "dp");
         panelHeightSeek.setProgress(panelBarHeightDp - PANEL_BAR_HEIGHT_MIN_DP);
         panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
     }
 
-    /** Live-resizes the currently-open settings popup itself as its own
-     *  Size slider moves - grows/shrinks from its current top-left corner,
-     *  same anchor the drag handle repositions from. */
-    private void applyPopupSizeLive() {
-        if (!themePopupAdded || themePopupParams == null) return;
-        themePopupParams.width = dp(popupDiameterDp);
-        wm.updateViewLayout(themePopupRoot, themePopupParams);
+    /** Live-resizes the floating bubble (and its icon, via refreshVisuals()
+     *  -> updateTabAppearance()) as the Size tab's slider moves. The tab
+     *  window is usually hidden while this popup is open (the panel took
+     *  its place), so the resize itself is applied to tabParams right away
+     *  but the visual effect on the tab only appears once the panel closes
+     *  and addTabWindow() rebuilds it - positionTab() is still called
+     *  defensively in case a future path has the tab and popup up together. */
+    private void applyBubbleSizeLive() {
+        positionTab();
+        refreshVisuals();
     }
 
     // ---------------------------------------------------------- Conf tab
@@ -737,7 +754,7 @@ public class VolumeOverlayService extends Service {
                 Point sz = screenSize();
                 int dx = Math.round(event.getRawX() - dragHandleDownRawX);
                 int dy = Math.round(event.getRawY() - dragHandleDownRawY);
-                int popupH = themePopupRoot.getHeight() > 0 ? themePopupRoot.getHeight() : dp(popupDiameterDp);
+                int popupH = themePopupRoot.getHeight() > 0 ? themePopupRoot.getHeight() : dp(SETTINGS_POPUP_DIAMETER_DP);
                 int newX = clampInt(dragHandleStartX + dx, 0, Math.max(0, sz.x - themePopupParams.width));
                 int newY = clampInt(dragHandleStartY + dy, 0, Math.max(0, sz.y - popupH));
                 themePopupParams.x = newX;
@@ -835,7 +852,7 @@ public class VolumeOverlayService extends Service {
             }
 
             if (themePopupRoot == null) inflateThemePopup();
-            int diameterPx = dp(popupDiameterDp);
+            int diameterPx = dp(SETTINGS_POPUP_DIAMETER_DP);
             themePopupParams = newOverlayParams(diameterPx, WindowManager.LayoutParams.WRAP_CONTENT);
 
             Point sz = screenSize();
@@ -980,6 +997,9 @@ public class VolumeOverlayService extends Service {
         ImageView icon = tabRoot.findViewById(R.id.tabIcon);
         icon.setColorFilter(Color.parseColor("#77592A"));
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) icon.getLayoutParams();
+        int iconSize = dp(Math.round(bubbleWidthDp * TAB_ICON_RATIO));
+        lp.width = iconSize;
+        lp.height = iconSize;
         lp.gravity = Gravity.CENTER_VERTICAL | ("left".equals(side) ? Gravity.START : Gravity.END);
         lp.leftMargin = "left".equals(side) ? dp(8) : 0;
         lp.rightMargin = "right".equals(side) ? dp(8) : 0;

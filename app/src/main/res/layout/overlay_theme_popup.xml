@@ -205,19 +205,19 @@
             android:visibility="gone">
 
             <TextView
-                android:id="@+id/popupSizeLabel"
+                android:id="@+id/bubbleSizeLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Popup size: 260dp"
+                android:text="Bubble size: 52dp"
                 android:textColor="@color/ink"
                 android:textSize="12sp" />
 
             <SeekBar
-                android:id="@+id/popupSizeSeek"
+                android:id="@+id/bubbleSizeSeek"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:max="160"
-                android:progress="80" />
+                android:max="54"
+                android:progress="16" />
 
             <TextView
                 android:id="@+id/panelWidthLabel"
