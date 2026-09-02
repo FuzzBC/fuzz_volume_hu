@@ -39,6 +39,8 @@ public class Prefs {
 
     // Theme tab
     private static final String KEY_DYNAMIC_COLOR = "dynamic_color"; // true: color follows volume (theme color -> red at max); false: flat theme color everywhere ("merge")
+    private static final String KEY_LEDCAR_SYNC = "ledcar_sync";         // "LEDCAR Set" checkbox - mirror LEDCAR's own current color instead of the theme
+    private static final String KEY_LEDCAR_LAST_COLOR = "ledcar_last_color"; // last color received from LEDCAR (-1 = none received yet)
 
     // Form tab
     private static final String KEY_FORM = "panel_form"; // index into VolumeOverlayService.FORM_NAMES / EqBarView's form styles
@@ -89,6 +91,12 @@ public class Prefs {
 
     public boolean isDynamicColor() { return sp.getBoolean(KEY_DYNAMIC_COLOR, true); }
     public void setDynamicColor(boolean dynamic) { sp.edit().putBoolean(KEY_DYNAMIC_COLOR, dynamic).commit(); }
+
+    public boolean isLedcarSync() { return sp.getBoolean(KEY_LEDCAR_SYNC, false); }
+    public void setLedcarSync(boolean enabled) { sp.edit().putBoolean(KEY_LEDCAR_SYNC, enabled).commit(); }
+
+    public int getLedcarLastColor() { return sp.getInt(KEY_LEDCAR_LAST_COLOR, -1); }
+    public void setLedcarLastColor(int color) { sp.edit().putInt(KEY_LEDCAR_LAST_COLOR, color).commit(); }
 
     public int getForm() { return sp.getInt(KEY_FORM, 0); }
     public void setForm(int form) { sp.edit().putInt(KEY_FORM, form).commit(); }

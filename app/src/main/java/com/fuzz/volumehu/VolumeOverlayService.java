@@ -121,6 +121,8 @@ public class VolumeOverlayService extends Service {
     private float vpos;
     private int themeIndex;
     private boolean dynamicColor;      // Theme tab: color follows volume vs. flat merge color
+    private boolean ledcarSyncEnabled; // Theme tab: "LEDCAR Set" - mirror LEDCAR's own color instead of the theme, highest priority when on
+    private int ledcarColor = -1;      // last color received from LEDCAR (Color.rgb-encoded); -1 = none received yet this run
     private int formIndex;             // Form tab: index into EqBarView.FORM_NAMES
     private int panelBgShape;          // Form tab: index into BG_SHAPE_NAMES
     private int bubbleBgShape;         // Form tab: index into BG_SHAPE_NAMES
@@ -175,6 +177,9 @@ public class VolumeOverlayService extends Service {
     private TextView themeCurrent;
     private final View[] themeSwatches = new View[ThemeColors.THEMES.length];
     private CheckBox dynamicCheck;
+    private CheckBox ledcarSyncCheck;
+    private BroadcastReceiver ledcarColorReceiver;
+    private boolean ledcarReceiverRegistered = false;
 
     // Popup tabs
     private TextView tabTheme, tabSize, tabConf, tabForm;
@@ -236,6 +241,8 @@ public class VolumeOverlayService extends Service {
             vpos = prefs.getVpos();
             themeIndex = prefs.getTheme();
             dynamicColor = prefs.isDynamicColor();
+            ledcarSyncEnabled = prefs.isLedcarSync();
+            ledcarColor = prefs.getLedcarLastColor();
             formIndex = clampInt(prefs.getForm(), 0, EqBarView.FORM_NAMES.length - 1);
             panelBgShape = clampInt(prefs.getPanelBgShape(), 0, BG_SHAPE_NAMES.length - 1);
             bubbleBgShape = clampInt(prefs.getBubbleBgShape(), 0, BG_SHAPE_NAMES.length - 1);
@@ -260,6 +267,7 @@ public class VolumeOverlayService extends Service {
 
             registerVolumeReceiver();
             TraceLog.step(this, "registered volume receiver");
+            if (ledcarSyncEnabled) registerLedcarReceiver();
             buildTabView();
             TraceLog.step(this, "built tab view");
             addTabWindow();
@@ -308,6 +316,7 @@ public class VolumeOverlayService extends Service {
         try { persistSizeAndConfPrefsNow(); } catch (Exception ignored) {} // flush any pending Size/Conf slider edits before this instance is gone
         try { if (prefs != null) prefs.setOverlayStarted(false); } catch (Exception ignored) {}
         try { if (volumeReceiver != null) unregisterReceiver(volumeReceiver); } catch (Exception ignored) {}
+        try { unregisterLedcarReceiver(); } catch (Exception ignored) {}
         try { if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null); } catch (Exception ignored) {}
         try { removeTabWindow(); } catch (Exception ignored) {}
         try { if (panelAdded && wm != null) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
@@ -355,6 +364,46 @@ public class VolumeOverlayService extends Service {
         } else {
             registerReceiver(volumeReceiver, f);
         }
+    }
+
+    /** "LEDCAR Set" (Theme tab): listens for FuZz LEDCAR's own color-change
+     *  broadcast (see that app's MainActivity.broadcastColorToExternalApps())
+     *  and mirrors it here. Unlike volumeReceiver, this MUST be
+     *  RECEIVER_EXPORTED on API 33+ - the sender is a genuinely different
+     *  app/UID, not this app's own process talking to itself, so
+     *  NOT_EXPORTED (which only allows same-app senders) would silently
+     *  block it. */
+    private void registerLedcarReceiver() {
+        if (ledcarReceiverRegistered) return;
+        try {
+            ledcarColorReceiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) {
+                    int r = intent.getIntExtra("r", -1);
+                    int g = intent.getIntExtra("g", -1);
+                    int b = intent.getIntExtra("b", -1);
+                    if (r < 0 || g < 0 || b < 0) return;
+                    ledcarColor = Color.rgb(
+                            clampInt(r, 0, 255), clampInt(g, 0, 255), clampInt(b, 0, 255));
+                    prefs.setLedcarLastColor(ledcarColor);
+                    refreshVisuals();
+                }
+            };
+            IntentFilter f = new IntentFilter("com.ledcar01.controller.COLOR_CHANGED");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(ledcarColorReceiver, f, Context.RECEIVER_EXPORTED);
+            } else {
+                registerReceiver(ledcarColorReceiver, f);
+            }
+            ledcarReceiverRegistered = true;
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "registerLedcarReceiver failed", e);
+        }
+    }
+
+    private void unregisterLedcarReceiver() {
+        if (!ledcarReceiverRegistered) return;
+        try { if (ledcarColorReceiver != null) unregisterReceiver(ledcarColorReceiver); } catch (Exception ignored) {}
+        ledcarReceiverRegistered = false;
     }
 
     private int getRawVolume() { return audioManager.getStreamVolume(AudioManager.STREAM_MUSIC); }
@@ -625,6 +674,7 @@ public class VolumeOverlayService extends Service {
         ImageButton themeClose = themePopupRoot.findViewById(R.id.themeClose);
         ImageButton dragHandle = themePopupRoot.findViewById(R.id.dragHandle);
         dynamicCheck = themePopupRoot.findViewById(R.id.dynamicCheck);
+        ledcarSyncCheck = themePopupRoot.findViewById(R.id.ledcarSyncCheck);
 
         tabTheme = themePopupRoot.findViewById(R.id.tabTheme);
         tabSize = themePopupRoot.findViewById(R.id.tabSize);
@@ -675,6 +725,14 @@ public class VolumeOverlayService extends Service {
         dynamicCheck.setOnCheckedChangeListener((btn, checked) -> {
             dynamicColor = checked;
             prefs.setDynamicColor(checked);
+            refreshVisuals();
+        });
+
+        ledcarSyncCheck.setChecked(ledcarSyncEnabled);
+        ledcarSyncCheck.setOnCheckedChangeListener((btn, checked) -> {
+            ledcarSyncEnabled = checked;
+            prefs.setLedcarSync(checked);
+            if (checked) registerLedcarReceiver(); else unregisterLedcarReceiver();
             refreshVisuals();
         });
 
@@ -1224,6 +1282,11 @@ public class VolumeOverlayService extends Service {
      *  red as it nears widgetMax, "limited to"); unchecked, one flat theme
      *  color everywhere regardless of volume ("merge with theme"). */
     private int colorForCurrent(int raw) {
+        // "LEDCAR Set" overrides the theme entirely, once a color has
+        // actually arrived - highest priority, same idea as Dynamic but
+        // sourced from LEDCAR's own current color instead of this app's
+        // own theme picker.
+        if (ledcarSyncEnabled && ledcarColor != -1) return ledcarColor;
         int idx = Math.max(0, Math.min(ThemeColors.THEMES.length - 1, themeIndex));
         int themeColor = ThemeColors.THEMES[idx].mid;
         if (!dynamicColor) return themeColor;

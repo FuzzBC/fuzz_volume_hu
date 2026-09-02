@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.027
+- New "LEDCAR Set" checkbox on the Theme tab: mirrors whatever color is currently set in FuZz LEDCAR, overriding the theme entirely once one arrives. Needs FuZz LEDCAR v1.036+ (it now announces its color to other FuZz apps whenever you pick one - swatch, RGB dialog, or the color wheel).
+
 ## 1.026
 - New Form tab: 15 additional visual styles for the volume meter (Clear mode, Liquid fill, Dial, Speedometer, Minimal line, Chunky LED, Neumorphic, Glass, Dot column, Ring, Thermometer, Equalizer wave, Icon header, Compact pill, Retro LCD) alongside the original Classic EQ, all sharing the exact same drag behavior - only how it looks changes, never how it responds to a touch.
 - Form tab also adds independent background-shape pickers for the volume panel and for the floating bubble (Themed / Rounded / Square / Pill / Clear) - Clear removes the card/bubble background entirely; when the bubble has no background the icon itself picks up the volume color instead, so that signal isn't lost.
