@@ -80,7 +80,7 @@ public class VolumeOverlayService extends Service {
     // Conf tab slider range (volume units) for "max volume supported" - the
     // other two tiers ("limited to", "when go slowly") are bounded by
     // whichever tier sits directly above them instead of a fixed range.
-    private static final int MAX_SUPPORTED_MIN = 25, MAX_SUPPORTED_MAX = 100;
+    private static final int MAX_SUPPORTED_MIN = 10, MAX_SUPPORTED_MAX = 100;
 
     public static void start(Context ctx) {
         ContextCompat.startForegroundService(ctx, new Intent(ctx, VolumeOverlayService.class));
@@ -469,6 +469,7 @@ public class VolumeOverlayService extends Service {
         int y = clampInt(tabCenterY - panelH / 2, minY, Math.max(minY, maxY));
         panelParams.x = x;
         panelParams.y = y;
+        panelParams.width = panelW; // the Size tab's width slider needs the WINDOW itself resized, not just re-measured
         if (panelAdded) wm.updateViewLayout(panelRoot, panelParams);
     }
 

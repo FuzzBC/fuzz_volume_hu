@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.019
+- Fixed: the Size tab's "volume panel width" slider didn't actually resize the panel - positionPanel() re-measured the panel's content internally but never resized the overlay window itself, so the on-screen panel stayed whatever width it was when first opened. It now resizes for real.
+- "Max volume supported" (Conf tab) can now go as low as 10 (was 25).
+
 ## 1.018
 - Opening the app now auto-starts the overlay (if permissions are already granted and it isn't running yet) instead of requiring a manual "Start volume overlay" tap every time - puts up the permanent/ongoing notification right away, which is what keeps the foreground service (and so the app) alive. Skipped right after a crash, and only ever fires on an actual app open (onCreate), never just returning to this screen.
 
