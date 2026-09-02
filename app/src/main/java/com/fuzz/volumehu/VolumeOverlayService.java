@@ -25,13 +25,18 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.SeekBar;
 import android.widget.TextView;
+
+import java.util.function.IntConsumer;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -67,8 +72,15 @@ public class VolumeOverlayService extends Service {
     private static final long TAP_MAX_MS = 350;
     private static final long THEME_HOLD_MS = 2000;
     private static final long NUDGE_COOLDOWN_MS = 500;
-    private static final int WIDGET_MAX = 25; // this widget's own ceiling - see class doc
-    private static final int PANEL_WIDTH_DP = 150; // matches overlay_panel.xml's root width
+
+    // Size tab slider ranges (dp) - min value + seekbar's 0-based progress.
+    private static final int POPUP_DIAMETER_MIN_DP = 180, POPUP_DIAMETER_MAX_DP = 340;
+    private static final int PANEL_WIDTH_MIN_DP = 110, PANEL_WIDTH_MAX_DP = 260;
+    private static final int PANEL_BAR_HEIGHT_MIN_DP = 90, PANEL_BAR_HEIGHT_MAX_DP = 260;
+    // Conf tab slider range (volume units) for "max volume supported" - the
+    // other two tiers ("limited to", "when go slowly") are bounded by
+    // whichever tier sits directly above them instead of a fixed range.
+    private static final int MAX_SUPPORTED_MIN = 25, MAX_SUPPORTED_MAX = 100;
 
     public static void start(Context ctx) {
         ContextCompat.startForegroundService(ctx, new Intent(ctx, VolumeOverlayService.class));
@@ -88,6 +100,13 @@ public class VolumeOverlayService extends Service {
     private String side;
     private float vpos;
     private int themeIndex;
+    private boolean dynamicColor;      // Theme tab: color follows volume vs. flat merge color
+    private int popupDiameterDp;       // Size tab
+    private int panelWidthDp;          // Size tab
+    private int panelBarHeightDp;      // Size tab
+    private int maxVolumeSupported;    // Conf tab: EQ bar's full-scale top
+    private int widgetMax;             // Conf tab: "limited to" - this widget's write ceiling
+    private int dragCap;               // Conf tab: "when go slowly" - direct-drag ceiling
 
     private View tabRoot;
     private WindowManager.LayoutParams tabParams;
@@ -104,15 +123,40 @@ public class VolumeOverlayService extends Service {
     private EqBarView eqBar;
     private View readoutRow;
 
-    // The theme popup is its own top-level overlay window (see openPanel()
-    // vs showThemePopup()) so it can sit centered on the whole screen
-    // instead of being squeezed inside the docked side panel's width.
+    // The settings popup is its own top-level overlay window (see
+    // openPanel() vs showThemePopup()) so it can sit centered on the whole
+    // screen instead of being squeezed inside the docked side panel's
+    // width - and, unlike the panel, it's freely draggable (dragHandle) so
+    // it never has to stay centered if that's in the way. A separate
+    // full-screen backdrop window sits behind it purely to dim the screen
+    // and soak up outside taps.
+    private View themeBackdropRoot;
+    private WindowManager.LayoutParams themeBackdropParams;
+    private boolean themeBackdropAdded = false;
+
     private View themePopupRoot;
     private WindowManager.LayoutParams themePopupParams;
     private boolean themePopupAdded = false;
     private GridLayout themeGrid;
     private TextView themeCurrent;
     private final View[] themeSwatches = new View[ThemeColors.THEMES.length];
+    private CheckBox dynamicCheck;
+
+    // Popup tabs
+    private TextView tabTheme, tabSize, tabConf;
+    private View themeTabContent, sizeTabContent, confTabContent;
+
+    // Size tab
+    private TextView popupSizeLabel, panelWidthLabel, panelHeightLabel;
+    private SeekBar popupSizeSeek, panelWidthSeek, panelHeightSeek;
+
+    // Conf tab
+    private TextView confMaxLabel, confLimitLabel, confSlowLabel;
+    private SeekBar confMaxSeek, confLimitSeek, confSlowSeek;
+
+    // Settings popup drag handle
+    private float dragHandleDownRawX, dragHandleDownRawY;
+    private int dragHandleStartX, dragHandleStartY;
 
     private android.animation.ObjectAnimator holdAnim;
     private boolean nudgeLocked = false;
@@ -150,7 +194,19 @@ public class VolumeOverlayService extends Service {
             side = prefs.getSide();
             vpos = prefs.getVpos();
             themeIndex = prefs.getTheme();
-            TraceLog.step(this, "read prefs: side=" + side + " vpos=" + vpos + " theme=" + themeIndex);
+            dynamicColor = prefs.isDynamicColor();
+            popupDiameterDp = prefs.getPopupDiameterDp();
+            panelWidthDp = prefs.getPanelWidthDp();
+            panelBarHeightDp = prefs.getPanelBarHeightDp();
+            // Defensive clamp on load - Conf tab's tiers must stay ordered
+            // (maxVolumeSupported >= widgetMax >= dragCap) even if a future
+            // change to the defaults ever left a stale combination behind.
+            maxVolumeSupported = Math.max(1, prefs.getMaxVolumeSupported());
+            widgetMax = clampInt(prefs.getWidgetMax(), 1, maxVolumeSupported);
+            dragCap = clampInt(prefs.getDragCap(), 0, widgetMax);
+            TraceLog.step(this, "read prefs: side=" + side + " vpos=" + vpos + " theme=" + themeIndex
+                    + " dynamic=" + dynamicColor + " maxSupported=" + maxVolumeSupported
+                    + " widgetMax=" + widgetMax + " dragCap=" + dragCap);
 
             createNotificationChannel();
             TraceLog.step(this, "created notification channel");
@@ -202,6 +258,7 @@ public class VolumeOverlayService extends Service {
         try { removeTabWindow(); } catch (Exception ignored) {}
         try { if (panelAdded) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
         try { if (themePopupAdded) { wm.removeView(themePopupRoot); themePopupAdded = false; } } catch (Exception ignored) {}
+        try { if (themeBackdropAdded) { wm.removeView(themeBackdropRoot); themeBackdropAdded = false; } } catch (Exception ignored) {}
         stopForeground(true);
     }
 
@@ -248,10 +305,10 @@ public class VolumeOverlayService extends Service {
     private int getRawVolume() { return audioManager.getStreamVolume(AudioManager.STREAM_MUSIC); }
     private int getStreamMax() { return audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC); }
 
-    /** Writes a new volume, always capped at this widget's own ceiling (WIDGET_MAX). */
+    /** Writes a new volume, always capped at this widget's own ceiling (widgetMax - Conf tab's "limited to"). */
     private void setRealVolume(int desired) {
         try {
-            int clamped = Math.max(0, Math.min(Math.min(desired, WIDGET_MAX), getStreamMax()));
+            int clamped = Math.max(0, Math.min(Math.min(desired, widgetMax), getStreamMax()));
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, clamped, 0);
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "setStreamVolume failed", e);
@@ -376,7 +433,7 @@ public class VolumeOverlayService extends Service {
         removeTabWindow();
         try {
             if (panelRoot == null) inflatePanel();
-            panelParams = newOverlayParams(dp(PANEL_WIDTH_DP), WindowManager.LayoutParams.WRAP_CONTENT);
+            panelParams = newOverlayParams(dp(panelWidthDp), WindowManager.LayoutParams.WRAP_CONTENT);
             positionPanel();
             wm.addView(panelRoot, panelParams);
             panelAdded = true;
@@ -400,7 +457,7 @@ public class VolumeOverlayService extends Service {
 
     private void positionPanel() {
         Point sz = screenSize();
-        int panelW = dp(PANEL_WIDTH_DP);
+        int panelW = dp(panelWidthDp);
         panelRoot.measure(
                 View.MeasureSpec.makeMeasureSpec(panelW, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(sz.y, View.MeasureSpec.AT_MOST));
@@ -424,38 +481,282 @@ public class VolumeOverlayService extends Service {
         nudgeBtn = panelRoot.findViewById(R.id.nudgeBtn);
         collapseBtn = panelRoot.findViewById(R.id.collapseBtn);
         eqBar = panelRoot.findViewById(R.id.eqBar);
+        applyBarHeightLive();
+        eqBar.setVolMax(maxVolumeSupported);
+        eqBar.setDragCap(dragCap);
 
         readoutRow.setOnTouchListener(this::onThemeHoldTouch);
         collapseBtn.setOnClickListener(v -> closePanel());
         nudgeBtn.setOnClickListener(v -> onNudgeClick());
         eqBar.setListener(new EqBarView.Listener() {
-            @Override public void onDragValue(int value0to25) { setRealVolume(value0to25); }
+            @Override public void onDragValue(int value0toMax) { setRealVolume(value0toMax); }
             @Override public void onDragEnd() { /* already applied live */ }
         });
     }
 
-    /** Inflates the theme popup as its own top-level overlay window, separate
-     *  from the docked side panel, so it can sit centered on the whole
-     *  screen (see showThemePopup()) instead of squeezed into the panel's
-     *  150dp width. */
+    /** Applies panelBarHeightDp (Size tab) to the already-inflated EQ bar. */
+    private void applyBarHeightLive() {
+        if (eqBar == null) return;
+        ViewGroup.LayoutParams lp = eqBar.getLayoutParams();
+        if (lp == null) return;
+        lp.height = dp(panelBarHeightDp);
+        eqBar.setLayoutParams(lp);
+    }
+
+    /** Inflates the settings popup as its own top-level overlay window,
+     *  separate from the docked side panel, so it can sit centered on the
+     *  whole screen (see showThemePopup()) - and be freely dragged anywhere
+     *  after that (dragHandle) - instead of being squeezed into the panel's
+     *  own width. Three tabs: Theme, Size, Conf. */
     private void inflateThemePopup() {
         themePopupRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_theme_popup, null);
         themeGrid = themePopupRoot.findViewById(R.id.themeGrid);
         themeCurrent = themePopupRoot.findViewById(R.id.themeCurrent);
         Button themeDone = themePopupRoot.findViewById(R.id.themeDone);
         ImageButton themeClose = themePopupRoot.findViewById(R.id.themeClose);
+        ImageButton dragHandle = themePopupRoot.findViewById(R.id.dragHandle);
+        dynamicCheck = themePopupRoot.findViewById(R.id.dynamicCheck);
+
+        tabTheme = themePopupRoot.findViewById(R.id.tabTheme);
+        tabSize = themePopupRoot.findViewById(R.id.tabSize);
+        tabConf = themePopupRoot.findViewById(R.id.tabConf);
+        themeTabContent = themePopupRoot.findViewById(R.id.themeTabContent);
+        sizeTabContent = themePopupRoot.findViewById(R.id.sizeTabContent);
+        confTabContent = themePopupRoot.findViewById(R.id.confTabContent);
+
+        popupSizeLabel = themePopupRoot.findViewById(R.id.popupSizeLabel);
+        panelWidthLabel = themePopupRoot.findViewById(R.id.panelWidthLabel);
+        panelHeightLabel = themePopupRoot.findViewById(R.id.panelHeightLabel);
+        popupSizeSeek = themePopupRoot.findViewById(R.id.popupSizeSeek);
+        panelWidthSeek = themePopupRoot.findViewById(R.id.panelWidthSeek);
+        panelHeightSeek = themePopupRoot.findViewById(R.id.panelHeightSeek);
+
+        confMaxLabel = themePopupRoot.findViewById(R.id.confMaxLabel);
+        confLimitLabel = themePopupRoot.findViewById(R.id.confLimitLabel);
+        confSlowLabel = themePopupRoot.findViewById(R.id.confSlowLabel);
+        confMaxSeek = themePopupRoot.findViewById(R.id.confMaxSeek);
+        confLimitSeek = themePopupRoot.findViewById(R.id.confLimitSeek);
+        confSlowSeek = themePopupRoot.findViewById(R.id.confSlowSeek);
 
         themeDone.setOnClickListener(v -> hideThemePopup());
         themeClose.setOnClickListener(v -> hideThemePopup());
+        dragHandle.setOnTouchListener(this::onDragHandleTouch);
+
+        tabTheme.setOnClickListener(v -> selectSettingsTab(0));
+        tabSize.setOnClickListener(v -> selectSettingsTab(1));
+        tabConf.setOnClickListener(v -> selectSettingsTab(2));
+
+        dynamicCheck.setChecked(dynamicColor);
+        dynamicCheck.setOnCheckedChangeListener((btn, checked) -> {
+            dynamicColor = checked;
+            prefs.setDynamicColor(checked);
+            refreshVisuals();
+        });
 
         populateThemeGrid();
+        wireSizeTab();
+        wireConfTab();
+    }
+
+    private void selectSettingsTab(int index) {
+        themeTabContent.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
+        sizeTabContent.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
+        confTabContent.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
+        styleSettingsTab(tabTheme, index == 0);
+        styleSettingsTab(tabSize, index == 1);
+        styleSettingsTab(tabConf, index == 2);
+        // Each tab's content is a different height - re-layout the window
+        // now that tabContent's measured height has changed.
+        if (themePopupAdded) wm.updateViewLayout(themePopupRoot, themePopupParams);
+    }
+
+    private void styleSettingsTab(TextView tab, boolean selected) {
+        tab.setBackgroundResource(selected ? R.drawable.bg_done_button : R.drawable.bg_small_button);
+        tab.setTextColor(selected ? ContextCompat.getColor(this, R.color.cream) : Color.parseColor("#8A7A5C"));
+    }
+
+    // ---------------------------------------------------------- Size tab
+
+    private void wireSizeTab() {
+        popupSizeSeek.setMax(POPUP_DIAMETER_MAX_DP - POPUP_DIAMETER_MIN_DP);
+        panelWidthSeek.setMax(PANEL_WIDTH_MAX_DP - PANEL_WIDTH_MIN_DP);
+        panelHeightSeek.setMax(PANEL_BAR_HEIGHT_MAX_DP - PANEL_BAR_HEIGHT_MIN_DP);
+        syncSizeTabUI();
+
+        onSeek(popupSizeSeek, v -> {
+            popupDiameterDp = POPUP_DIAMETER_MIN_DP + v;
+            prefs.setPopupDiameterDp(popupDiameterDp);
+            popupSizeLabel.setText("Popup size: " + popupDiameterDp + "dp");
+            applyPopupSizeLive();
+        });
+        onSeek(panelWidthSeek, v -> {
+            panelWidthDp = PANEL_WIDTH_MIN_DP + v;
+            prefs.setPanelWidthDp(panelWidthDp);
+            panelWidthLabel.setText("Volume panel width: " + panelWidthDp + "dp");
+            if (panelAdded) positionPanel();
+        });
+        onSeek(panelHeightSeek, v -> {
+            panelBarHeightDp = PANEL_BAR_HEIGHT_MIN_DP + v;
+            prefs.setPanelBarHeightDp(panelBarHeightDp);
+            panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
+            applyBarHeightLive();
+            if (panelAdded) positionPanel();
+        });
+    }
+
+    private void syncSizeTabUI() {
+        popupSizeSeek.setProgress(popupDiameterDp - POPUP_DIAMETER_MIN_DP);
+        popupSizeLabel.setText("Popup size: " + popupDiameterDp + "dp");
+        panelWidthSeek.setProgress(panelWidthDp - PANEL_WIDTH_MIN_DP);
+        panelWidthLabel.setText("Volume panel width: " + panelWidthDp + "dp");
+        panelHeightSeek.setProgress(panelBarHeightDp - PANEL_BAR_HEIGHT_MIN_DP);
+        panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
+    }
+
+    /** Live-resizes the currently-open settings popup itself as its own
+     *  Size slider moves - grows/shrinks from its current top-left corner,
+     *  same anchor the drag handle repositions from. */
+    private void applyPopupSizeLive() {
+        if (!themePopupAdded || themePopupParams == null) return;
+        themePopupParams.width = dp(popupDiameterDp);
+        wm.updateViewLayout(themePopupRoot, themePopupParams);
+    }
+
+    // ---------------------------------------------------------- Conf tab
+
+    private void wireConfTab() {
+        confMaxSeek.setMax(MAX_SUPPORTED_MAX - MAX_SUPPORTED_MIN);
+        syncConfTabUI();
+
+        // Each slider only ever nudges the OTHER sliders' bounds/progress,
+        // never its own mid-drag - resetting a seekbar's own progress while
+        // the user's finger is still on it makes the touch jump/stutter.
+        onSeek(confMaxSeek, v -> {
+            maxVolumeSupported = MAX_SUPPORTED_MIN + v;
+            prefs.setMaxVolumeSupported(maxVolumeSupported);
+            confMaxLabel.setText("Max volume supported: " + maxVolumeSupported);
+
+            confLimitSeek.setMax(Math.max(1, maxVolumeSupported - 1));
+            if (widgetMax > maxVolumeSupported) {
+                widgetMax = maxVolumeSupported;
+                prefs.setWidgetMax(widgetMax);
+            }
+            confLimitSeek.setProgress(widgetMax - 1);
+            confLimitLabel.setText("Limited to: " + widgetMax);
+
+            confSlowSeek.setMax(widgetMax);
+            if (dragCap > widgetMax) {
+                dragCap = widgetMax;
+                prefs.setDragCap(dragCap);
+            }
+            confSlowSeek.setProgress(dragCap);
+            confSlowLabel.setText("When go slowly: " + dragCap);
+
+            applyConfLive();
+        });
+        onSeek(confLimitSeek, v -> {
+            widgetMax = clampInt(v + 1, 1, maxVolumeSupported);
+            prefs.setWidgetMax(widgetMax);
+            confLimitLabel.setText("Limited to: " + widgetMax);
+
+            confSlowSeek.setMax(widgetMax);
+            if (dragCap > widgetMax) {
+                dragCap = widgetMax;
+                prefs.setDragCap(dragCap);
+            }
+            confSlowSeek.setProgress(dragCap);
+            confSlowLabel.setText("When go slowly: " + dragCap);
+
+            applyConfLive();
+        });
+        onSeek(confSlowSeek, v -> {
+            dragCap = clampInt(v, 0, widgetMax);
+            prefs.setDragCap(dragCap);
+            confSlowLabel.setText("When go slowly: " + dragCap);
+            applyConfLive();
+        });
+    }
+
+    private void syncConfTabUI() {
+        confMaxSeek.setProgress(maxVolumeSupported - MAX_SUPPORTED_MIN);
+        confMaxLabel.setText("Max volume supported: " + maxVolumeSupported);
+        confLimitSeek.setMax(Math.max(1, maxVolumeSupported - 1));
+        confLimitSeek.setProgress(widgetMax - 1);
+        confLimitLabel.setText("Limited to: " + widgetMax);
+        confSlowSeek.setMax(widgetMax);
+        confSlowSeek.setProgress(dragCap);
+        confSlowLabel.setText("When go slowly: " + dragCap);
+    }
+
+    /** Pushes maxVolumeSupported/dragCap into the live EQ bar and re-renders
+     *  everything else that depends on the volume tiers (nudge visibility,
+     *  dynamic color fraction). */
+    private void applyConfLive() {
+        if (eqBar != null) {
+            eqBar.setVolMax(maxVolumeSupported);
+            eqBar.setDragCap(dragCap);
+        }
+        refreshVisuals();
+    }
+
+    /** Small SeekBar.OnSeekBarChangeListener helper - only user-driven
+     *  changes matter here (programmatic setProgress() calls, e.g. from
+     *  syncSizeTabUI()/syncConfTabUI(), must not re-trigger side effects). */
+    private void onSeek(SeekBar sb, IntConsumer onChange) {
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) onChange.accept(progress);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+    }
+
+    // ---------------------------------------------------------- Settings popup drag
+
+    private boolean onDragHandleTouch(View v, MotionEvent event) {
+        try {
+            return onDragHandleTouchInner(event);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "onDragHandleTouch failed", e);
+            return true;
+        }
+    }
+
+    private boolean onDragHandleTouchInner(MotionEvent event) {
+        if (themePopupParams == null) return false;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                dragHandleDownRawX = event.getRawX();
+                dragHandleDownRawY = event.getRawY();
+                dragHandleStartX = themePopupParams.x;
+                dragHandleStartY = themePopupParams.y;
+                return true;
+            case MotionEvent.ACTION_MOVE: {
+                Point sz = screenSize();
+                int dx = Math.round(event.getRawX() - dragHandleDownRawX);
+                int dy = Math.round(event.getRawY() - dragHandleDownRawY);
+                int popupH = themePopupRoot.getHeight() > 0 ? themePopupRoot.getHeight() : dp(popupDiameterDp);
+                int newX = clampInt(dragHandleStartX + dx, 0, Math.max(0, sz.x - themePopupParams.width));
+                int newY = clampInt(dragHandleStartY + dy, 0, Math.max(0, sz.y - popupH));
+                themePopupParams.x = newX;
+                themePopupParams.y = newY;
+                if (themePopupAdded) wm.updateViewLayout(themePopupRoot, themePopupParams);
+                return true;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                prefs.setPopupPos(themePopupParams.x, themePopupParams.y);
+                return true;
+        }
+        return false;
     }
 
     private void onNudgeClick() {
         try {
             if (nudgeLocked) return;
             int raw = getRawVolume();
-            if (raw >= WIDGET_MAX) return;
+            if (raw >= widgetMax) return;
             setRealVolume(raw + 1);
             nudgeLocked = true;
             nudgeBtn.animate().scaleX(1.3f).scaleY(1.3f).setDuration(140)
@@ -522,18 +823,45 @@ public class VolumeOverlayService extends Service {
     private void showThemePopup() {
         try {
             if (themePopupAdded) return;
+            if (themeBackdropRoot == null) {
+                themeBackdropRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_theme_backdrop, null);
+            }
+            if (!themeBackdropAdded) {
+                themeBackdropParams = newOverlayParams(
+                        WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+                wm.addView(themeBackdropRoot, themeBackdropParams);
+                themeBackdropAdded = true;
+            }
+
             if (themePopupRoot == null) inflateThemePopup();
-            // MATCH_PARENT on both axes: the popup's own root already
-            // centers the picker card within itself (layout_gravity=
-            // "center" in overlay_theme_popup.xml), so this window just
-            // needs to cover the full screen behind it for the dim
-            // backdrop and to be centered *on the screen*, not relative
-            // to the docked side panel.
-            themePopupParams = newOverlayParams(
-                    WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            int diameterPx = dp(popupDiameterDp);
+            themePopupParams = newOverlayParams(diameterPx, WindowManager.LayoutParams.WRAP_CONTENT);
+
+            Point sz = screenSize();
+            themePopupRoot.measure(
+                    View.MeasureSpec.makeMeasureSpec(diameterPx, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(sz.y, View.MeasureSpec.AT_MOST));
+            int popupH = themePopupRoot.getMeasuredHeight();
+
+            int savedX = prefs.getPopupX(), savedY = prefs.getPopupY();
+            int x, y;
+            if (savedX >= 0 && savedY >= 0) {
+                // A remembered drag position - keep it on-screen even if the
+                // popup's own size (Size tab) or the screen changed since.
+                x = clampInt(savedX, 0, Math.max(0, sz.x - diameterPx));
+                y = clampInt(savedY, 0, Math.max(0, sz.y - popupH));
+            } else {
+                x = (sz.x - diameterPx) / 2;
+                y = (sz.y - popupH) / 2;
+            }
+            themePopupParams.x = x;
+            themePopupParams.y = y;
+
             wm.addView(themePopupRoot, themePopupParams);
             themePopupAdded = true;
             refreshThemeGridSelection();
+            syncSizeTabUI();
+            syncConfTabUI();
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "showThemePopup failed", e);
         }
@@ -544,6 +872,10 @@ public class VolumeOverlayService extends Service {
             if (themePopupAdded) {
                 wm.removeView(themePopupRoot);
                 themePopupAdded = false;
+            }
+            if (themeBackdropAdded) {
+                wm.removeView(themeBackdropRoot);
+                themeBackdropAdded = false;
             }
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "hideThemePopup failed", e);
@@ -600,8 +932,8 @@ public class VolumeOverlayService extends Service {
     private void refreshVisuals() {
         try {
             int raw = getRawVolume();
-            int barVal = Math.max(0, Math.min(WIDGET_MAX, raw));
-            int color = ThemeColors.colorFor(themeIndex, barVal);
+            int barVal = Math.max(0, Math.min(maxVolumeSupported, raw));
+            int color = colorForCurrent(raw);
 
             updateTabAppearance(color);
 
@@ -609,7 +941,7 @@ public class VolumeOverlayService extends Service {
                 volNum.setText(String.valueOf(raw));
                 eqBar.setBarValue(barVal);
                 eqBar.setBallColor(color);
-                boolean showNudge = raw >= EqBarView.DRAG_CAP && raw < WIDGET_MAX;
+                boolean showNudge = raw >= dragCap && raw < widgetMax;
                 nudgeBtn.setVisibility(showNudge ? View.VISIBLE : View.INVISIBLE);
                 collapseBtn.setRotation("right".equals(side) ? 90f : -90f);
                 applyPanelTheme(color);
@@ -618,6 +950,19 @@ public class VolumeOverlayService extends Service {
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "refreshVisuals failed", e);
         }
+    }
+
+    /** The color the whole widget shows for a given raw volume - Theme tab's
+     *  Dynamic checkbox switches between two very different behaviors:
+     *  checked, the color follows volume (the theme's own color sliding to
+     *  red as it nears widgetMax, "limited to"); unchecked, one flat theme
+     *  color everywhere regardless of volume ("merge with theme"). */
+    private int colorForCurrent(int raw) {
+        int idx = Math.max(0, Math.min(ThemeColors.THEMES.length - 1, themeIndex));
+        int themeColor = ThemeColors.THEMES[idx].mid;
+        if (!dynamicColor) return themeColor;
+        float frac = widgetMax <= 0 ? 0f : Math.max(0f, Math.min(1f, raw / (float) widgetMax));
+        return mixColors(themeColor, Color.parseColor("#DC2626"), frac);
     }
 
     private void updateTabAppearance(int volumeColor) {
@@ -663,7 +1008,7 @@ public class VolumeOverlayService extends Service {
         if (btn == null) return;
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(mixColors(Color.parseColor("#DED9CC"), color, 0.35f));
-        bg.setCornerRadius(dp(7));
+        bg.setCornerRadius(dp(999)); // fully rounded (pill) - matches bg_small_button.xml
         btn.setBackground(bg);
     }
 

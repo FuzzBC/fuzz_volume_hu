@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Nudge/collapse arrow buttons - fully rounded (pill/oval); a radius bigger
+     than half the button's own height always renders as fully rounded. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="@color/cream" />
-    <corners android:radius="7dp" />
+    <corners android:radius="999dp" />
 </shape>

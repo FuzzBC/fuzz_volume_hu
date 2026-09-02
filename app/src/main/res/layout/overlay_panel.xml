@@ -73,7 +73,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
-                android:text="hold 2s for colors"
+                android:text="hold 2s for custom"
                 android:textColor="#A5936D"
                 android:textSize="9sp"
                 android:textAllCaps="true"

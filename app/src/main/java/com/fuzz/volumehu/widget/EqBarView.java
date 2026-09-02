@@ -15,19 +15,24 @@ import android.view.View;
  *              blocks (fixed green-to-red gradient, same as the mockup) with
  *              a theme-colored ball marking the current position. Owns its
  *              own touch handling: a drag never reports a value above
- *              DRAG_CAP (20), matching the "block drag up" spec - going
- *              past that only happens through the panel's nudge arrow.
+ *              dragCap ("when go slowly" on the Conf tab, 20 by default) -
+ *              going past that only happens through the panel's nudge arrow.
+ *              Both dragCap and the bar's full-scale volMax ("max volume
+ *              supported", 40 by default) are configurable at runtime via
+ *              setDragCap()/setVolMax() - see VolumeOverlayService.
  * Author:      FuzzBC
  * Date:        2026-09-01
  */
 public class EqBarView extends View {
 
+    /** Fallback defaults - the Conf tab (VolumeOverlayService) overrides both
+     *  via setVolMax()/setDragCap() from Prefs as soon as the panel inflates. */
     public static final int VOL_MAX = 25;
     public static final int DRAG_CAP = 20;
 
     /** Reports live drag values (dragEnd only fires once, on ACTION_UP/CANCEL). */
     public interface Listener {
-        void onDragValue(int value0to25);
+        void onDragValue(int value0toMax);
         void onDragEnd();
     }
 
@@ -41,7 +46,12 @@ public class EqBarView extends View {
     private final Paint ballBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF trackRect = new RectF();
 
-    private int barValue0to25 = 12; // clamped display value used for drawing (see Service: raw volume clamped to 0..25)
+    // Instance-level now (Conf tab's "max volume supported" / "when go slowly"
+    // sliders replace these at runtime) - the class constants above only seed
+    // the initial values so the view still works before Service configures it.
+    private int volMax = VOL_MAX;
+    private int dragCap = DRAG_CAP;
+    private int barValue0toMax = 12; // clamped display value used for drawing (see Service: raw volume clamped to 0..volMax)
     private int ballColor = Color.parseColor("#D97706");
     private Listener listener;
     private boolean dragging = false;
@@ -56,15 +66,28 @@ public class EqBarView extends View {
         ballBorderPaint.setStrokeWidth(dp(3));
     }
 
-    /** Sets the value this view draws - already clamped to 0..25 by the caller. */
-    public void setBarValue(int value0to25) {
-        barValue0to25 = Math.max(0, Math.min(VOL_MAX, value0to25));
+    /** Sets the value this view draws - already clamped to 0..volMax by the caller. */
+    public void setBarValue(int value0toMax) {
+        barValue0toMax = Math.max(0, Math.min(volMax, value0toMax));
         invalidate();
     }
 
     /** Sets the ball's border color (the active theme's color at the current volume). */
     public void setBallColor(int color) {
         ballColor = color;
+        invalidate();
+    }
+
+    /** The bar's full-scale top value - Conf tab's "max volume supported". */
+    public void setVolMax(int max) {
+        volMax = Math.max(1, max);
+        barValue0toMax = Math.min(barValue0toMax, volMax);
+        invalidate();
+    }
+
+    /** Where a direct drag stops (and the cap-line marker) - Conf tab's "when go slowly". */
+    public void setDragCap(int cap) {
+        dragCap = Math.max(0, Math.min(cap, volMax));
         invalidate();
     }
 
@@ -89,7 +112,7 @@ public class EqBarView extends View {
         trackRect.set(0, 0, w, h);
         canvas.drawRoundRect(trackRect, radius * 0.4f, radius * 0.4f, trackPaint);
 
-        float fillFrac = barValue0to25 / (float) VOL_MAX;
+        float fillFrac = barValue0toMax / (float) volMax;
         float fillTop = h * (1f - fillFrac);
 
         // Segmented fill: solid gradient rect, then cut cream gaps every few px.
@@ -105,8 +128,8 @@ public class EqBarView extends View {
         }
         canvas.restore();
 
-        // Cap line marking the drag ceiling (20/25 = 80% up from the bottom).
-        float capY = h * (1f - DRAG_CAP / (float) VOL_MAX);
+        // Cap line marking the drag ceiling ("when go slowly", up from the bottom).
+        float capY = h * (1f - dragCap / (float) volMax);
         canvas.drawLine(-dp(2), capY, w + dp(2), capY, capPaint);
 
         // Ball marker at the current position.
@@ -151,8 +174,8 @@ public class EqBarView extends View {
     private void reportDrag(float y) {
         float h = getHeight();
         float t = 1f - Math.max(0f, Math.min(1f, y / h));
-        int raw = Math.round(t * VOL_MAX);
-        int capped = Math.min(raw, DRAG_CAP);
+        int raw = Math.round(t * volMax);
+        int capped = Math.min(raw, dragCap);
         if (listener != null) listener.onDragValue(Math.max(0, capped));
     }
 }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.017
+- Hold-hint text now reads "hold 2s for custom" (the popup is a full settings screen now, not just colors).
+- Settings popup is now freely draggable: a drag handle next to Close (top-right) lets you move the whole popup anywhere on screen; it opens centered the first time and remembers wherever you last dragged it after that.
+- Settings popup is now three tabs: **Theme** (the 24 colors + Dynamic checkbox), **Size**, **Conf**.
+- Theme tab: new "Dynamic" checkbox. Checked (default): color follows volume, sliding from the theme's own color to red as it nears the "limited to" ceiling. Unchecked: one flat theme color everywhere, ignoring volume ("merge with theme").
+- Size tab: sliders for popup size, volume panel width, and volume panel height (the EQ bar's length) - all live and persisted.
+- Conf tab: sliders for the three volume tiers - "max volume supported" (40 default, the EQ bar's full scale), "limited to" (25 default, this widget's own write ceiling for drag/nudge), and "when go slowly" (20 default, where direct drag stops and the nudge arrow takes over). Each tier is bounded by the one above it.
+- Nudge/collapse arrow buttons are now fully rounded (pill-shaped) instead of a 7dp corner radius.
+
 ## 1.016
 - Theme popup now opens after a 2s hold instead of 5s.
 - Theme popup is now its own centered overlay window, positioned in the middle of the whole screen, instead of being squeezed inside the docked side panel's width.

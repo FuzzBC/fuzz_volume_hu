@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dims the screen behind the settings popup card (a separate overlay
+     window - see VolumeOverlayService.showThemePopup()) so the card itself
+     can be a small, freely-draggable window instead of being pinned to
+     match_parent. This backdrop has no listener - it just soaks up taps
+     outside the card as a soft modal barrier. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#7F140F08" />
