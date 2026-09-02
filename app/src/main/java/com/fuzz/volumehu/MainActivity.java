@@ -125,21 +125,27 @@ public class MainActivity extends AppCompatActivity {
         // Skipped right after a crash so it isn't stacked on top of that
         // dialog.
         //
-        // NOTE: this used to also auto-start the overlay the first time
-        // permissions were already granted. Removed - "white page, then
-        // crash" was reported specifically (and only) under that exact
-        // condition, meaning VolumeOverlayService.start() dispatching a
-        // moment later is the prime suspect for taking the whole shared
-        // process down before the plain screen ever got to draw. Starting
-        // the overlay is ALWAYS a manual "Start volume overlay" tap now,
-        // with zero exceptions, so this screen is guaranteed stable no
-        // matter what permission state the app is in - needed to actually
-        // reach the trace log instead of racing a crash to get there.
+        // NOTE: auto-starting the overlay here used to be removed entirely -
+        // "white page, then crash" was reported specifically (and only)
+        // when permissions were already granted, i.e. exactly this
+        // condition. That turned out to be a wrong XML resource namespace
+        // in every layout file (see CHANGELOG 1.015), not the auto-start
+        // itself - every layout inflation crashed instantly regardless of
+        // what triggered it. Fixed and confirmed stable across several
+        // releases since, so maybeAutoStartOverlay() below restores it:
+        // opening the app now puts up the permanent/ongoing notification
+        // (foreground service) right away instead of requiring a manual
+        // "Start volume overlay" tap every single time.
         if (!justShowedCrash) {
             try {
                 showMissingPermissionsDialog();
             } catch (Exception e) {
                 android.util.Log.w("MainActivity", "showMissingPermissionsDialog failed", e);
+            }
+            try {
+                maybeAutoStartOverlay();
+            } catch (Exception e) {
+                android.util.Log.w("MainActivity", "maybeAutoStartOverlay failed", e);
             }
         }
         TraceLog.step(this, "MainActivity.onCreate end");
@@ -174,6 +180,21 @@ public class MainActivity extends AppCompatActivity {
                     try { TraceLog.logFile(this).delete(); } catch (Exception ignored) {}
                 })
                 .show();
+    }
+
+    /**
+     * Starts the overlay (its permanent/ongoing notification is what keeps
+     * the foreground service - and so the app - alive) the moment this
+     * screen opens, but only if the needed permissions are already granted
+     * and it isn't running already; never forces a permission prompt from
+     * here. A no-op call otherwise, so it's always safe to call unconditionally.
+     */
+    private void maybeAutoStartOverlay() {
+        if (prefs.wasOverlayStarted()) return;
+        if (!canDrawOverlays() || !notificationsGranted()) return;
+        TraceLog.step(this, "auto-starting overlay on app open");
+        VolumeOverlayService.start(this);
+        refreshStatus();
     }
 
     private boolean notificationsGranted() {
@@ -268,8 +289,9 @@ public class MainActivity extends AppCompatActivity {
         TraceLog.step(this, "MainActivity.onResume");
         refreshStatus();
         justShowedCrash = false;
-        // Starting the overlay from here is never automatic - see
-        // maybeFirstRunAutoStart() (onCreate only) for the one exception.
+        // Starting the overlay from here (a return to this screen) is never
+        // automatic - see maybeAutoStartOverlay() (onCreate only, i.e. an
+        // actual app open) for the one exception.
     }
 
     private boolean canDrawOverlays() {
