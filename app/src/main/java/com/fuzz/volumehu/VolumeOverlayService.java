@@ -611,7 +611,14 @@ public class VolumeOverlayService extends Service {
             int color = colorForCurrent(getRawVolume());
             View panelCard = panelRoot.findViewById(R.id.panelCard);
             float bubbleRadius = dp(999);
-            float[] endRadii = panelCornerRadii();
+            // Must match whatever Panel background shape (Form tab) is
+            // actually selected, not just assume Themed - morphing toward
+            // the wrong shape the whole time and then snapping to the
+            // real one only once the animation ends is exactly the "shape
+            // bug" this was fixing. Null means Clear: no background at
+            // any point during the animation either, same as the settled
+            // state already had.
+            float[] endRadii = targetPanelCornerRadii();
 
             android.animation.ValueAnimator anim = android.animation.ValueAnimator.ofFloat(0f, 1f);
             anim.setDuration(340);
@@ -626,12 +633,16 @@ public class VolumeOverlayService extends Service {
                     if (panelAdded) wm.updateViewLayout(panelRoot, panelParams);
 
                     if (panelCard != null) {
-                        GradientDrawable bg = new GradientDrawable();
-                        bg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
-                        float[] radii = new float[8];
-                        for (int i = 0; i < 8; i++) radii[i] = bubbleRadius + (endRadii[i] - bubbleRadius) * t;
-                        bg.setCornerRadii(radii);
-                        panelCard.setBackground(bg);
+                        if (endRadii != null) {
+                            GradientDrawable bg = new GradientDrawable();
+                            bg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
+                            float[] radii = new float[8];
+                            for (int i = 0; i < 8; i++) radii[i] = bubbleRadius + (endRadii[i] - bubbleRadius) * t;
+                            bg.setCornerRadii(radii);
+                            panelCard.setBackground(bg);
+                        } else {
+                            panelCard.setBackground(null);
+                        }
 
                         if (panelCard instanceof ViewGroup) {
                             float contentAlpha = Math.max(0f, Math.min(1f, (t - 0.35f) / 0.65f));
@@ -1561,6 +1572,21 @@ public class VolumeOverlayService extends Service {
         return "left".equals(side)
                 ? new float[]{0, 0, r, r, r, r, 0, 0}
                 : new float[]{r, r, 0, 0, 0, 0, r, r};
+    }
+
+    /** The panel card's actual target corner radii for whichever Panel
+     *  background shape (Form tab) is currently selected - same values
+     *  applyPanelTheme() itself uses, kept in sync so the open-morph
+     *  animation (animateMorphOpen()) targets the real shape instead of
+     *  always assuming Themed. Null means Clear - no background shape at all. */
+    private float[] targetPanelCornerRadii() {
+        switch (panelBgShape) {
+            case 1: { float r = dp(18); return new float[]{r, r, r, r, r, r, r, r}; }  // Rounded
+            case 2: return new float[]{0, 0, 0, 0, 0, 0, 0, 0};                        // Square
+            case 3: { float r = dp(999); return new float[]{r, r, r, r, r, r, r, r}; } // Pill
+            case 4: return null;                                                       // Clear
+            default: return panelCornerRadii();                                        // Themed
+        }
     }
 
     // ---------------------------------------------------------- helpers

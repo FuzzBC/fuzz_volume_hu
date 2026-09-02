@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.032
+- Fixed: the open-morph animation (1.031) always grew toward the "Themed" panel shape, ignoring whatever Panel background shape was actually selected on the Form tab (Rounded/Square/Pill/Clear) - it would morph toward the wrong shape for the whole animation, then visibly snap to the real one the instant it ended. On Clear it also briefly drew a background that shouldn't exist at all before it vanished. The animation now targets whichever shape is actually selected, and draws no background throughout on Clear, same as the settled state.
+
 ## 1.031
 - Tapping the bubble now grows it open instead of instantly swapping to the panel - one window animating from the bubble's own size/position/shape to the panel's, its corner radii morphing from the bubble's fully rounded edge to the panel's own shape in lockstep, with the panel's actual content (readout/EQ bar/buttons) cross-fading in over the back half of the ~340ms run. Closing (collapse arrow, tap-outside, long-press) is unchanged - still instant; ask if you want that animated to match.
 
