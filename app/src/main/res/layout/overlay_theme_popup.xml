@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The 5s(->2s)-hold theme popup - its own full-screen overlay window
+     (not nested inside the docked side panel) so the picker card can sit
+     centered on the screen instead of being squeezed into the panel's
+     150dp width. 24 colors, previews live, stays open until Done. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#7F140F08">
+
+    <LinearLayout
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/bg_panel_card"
+        android:elevation="10dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Volume color"
+                android:textColor="@color/ink"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/themeClose"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:background="@drawable/bg_round_button"
+                android:src="@drawable/ic_close"
+                android:scaleType="center"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="260dp">
+
+            <GridLayout
+                android:id="@+id/themeGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="4"
+                android:padding="8dp" />
+        </ScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="10dp"
+            android:background="#0A000000">
+
+            <TextView
+                android:id="@+id/themeCurrent"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Original"
+                android:textColor="#8A7A5C"
+                android:textSize="10sp"
+                android:textAllCaps="true" />
+
+            <Button
+                android:id="@+id/themeDone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="Done"
+                android:textAllCaps="false"
+                android:textColor="@color/cream"
+                android:background="@drawable/bg_done_button" />
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

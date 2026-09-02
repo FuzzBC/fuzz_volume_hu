@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.016
+- Theme popup now opens after a 2s hold instead of 5s.
+- Theme popup is now its own centered overlay window, positioned in the middle of the whole screen, instead of being squeezed inside the docked side panel's width.
+- Picking a theme now re-skins the whole open panel - card background, nudge/collapse button backgrounds, and the hold-progress bar - not just the EQ ball, matching the selected color.
+- Panel is narrower: 150dp instead of 184dp.
+- The panel card's corner shape now flips to match whichever edge it's docked to (flat against the screen edge, rounded facing into the screen) - same logic the floating tab already used.
+- Tab's speaker icon is 20% smaller (22dp -> 17.6dp).
+
 ## 1.015
 - **Found the actual root cause of every crash-on-open report across the last several versions**: every layout and drawable XML file in the project declared the resource namespace as `http://schemas.android.com/res/android` instead of the correct `http://schemas.android.com/apk/res/android` (missing `apk/`). This is subtle - `aapt2` compiles it without error and even `aapt2 dump xmltree` shows the attributes looking fine - but the on-device runtime's strict binary-XML parser doesn't recognize `android:` attributes under the wrong namespace as real framework attributes at all, so every `layout_width`/`layout_height`/etc. was silently discarded, and `setContentView()` threw `InflateException: ... You must supply a layout_width attribute` instantly, before a single trace-log line could even be written for it. Found by diffing against FuZz LEDCAR (a sibling app confirmed working on the same head unit hardware), which had the correct namespace. Fixed in all 8 affected files (activity_main.xml, overlay_panel.xml, overlay_tab.xml, theme_swatch_item.xml, and the 4 bg_*.xml drawables). Verified on a real device via adb: the app now opens, `setContentView` completes, and the overlay service starts end-to-end (`onCreate SUCCESS`) with zero crashes.
 

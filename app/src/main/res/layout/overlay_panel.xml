@@ -4,7 +4,7 @@
      Root is a FrameLayout so the theme popup can sit on top of the card
      inside this same overlay window instead of needing a third window. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="184dp"
+    android:layout_width="150dp"
     android:layout_height="wrap_content">
 
     <LinearLayout
@@ -73,7 +73,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
-                android:text="hold 5s for colors"
+                android:text="hold 2s for colors"
                 android:textColor="#A5936D"
                 android:textSize="9sp"
                 android:textAllCaps="true"
@@ -109,93 +109,5 @@
             android:scaleType="centerInside"
             android:contentDescription="Collapse panel" />
     </LinearLayout>
-
-    <!-- Theme popup: 24 colors, previews live, stays open until Done. -->
-    <FrameLayout
-        android:id="@+id/themePopup"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#7F140F08"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:orientation="vertical"
-            android:background="@drawable/bg_panel_card"
-            android:elevation="10dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="10dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Volume color"
-                    android:textColor="@color/ink"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/themeClose"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:background="@drawable/bg_round_button"
-                    android:src="@drawable/ic_close"
-                    android:scaleType="center"
-                    android:contentDescription="Close" />
-            </LinearLayout>
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="260dp">
-
-                <GridLayout
-                    android:id="@+id/themeGrid"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:columnCount="4"
-                    android:padding="8dp" />
-            </ScrollView>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="10dp"
-                android:background="#0A000000">
-
-                <TextView
-                    android:id="@+id/themeCurrent"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Original"
-                    android:textColor="#8A7A5C"
-                    android:textSize="10sp"
-                    android:textAllCaps="true" />
-
-                <Button
-                    android:id="@+id/themeDone"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:paddingStart="20dp"
-                    android:paddingEnd="20dp"
-                    android:text="Done"
-                    android:textAllCaps="false"
-                    android:textColor="@color/cream"
-                    android:background="@drawable/bg_done_button" />
-            </LinearLayout>
-        </LinearLayout>
-    </FrameLayout>
 
 </FrameLayout>

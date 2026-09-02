@@ -44,7 +44,7 @@ import com.fuzz.volumehu.widget.ThemeColors;
  * File:        VolumeOverlayService.java
  * Description: The whole floating widget - the always-on half-circle tab
  *              and the expandable panel (EQ-segments bar/ball, nudge arrow,
- *              5s-hold theme popup, collapse arrow). Runs as a foreground
+ *              2s-hold theme popup, collapse arrow). Runs as a foreground
  *              service with an ongoing notification so the OS won't kill it
  *              for memory pressure or a recents-list swipe; the only way to
  *              actually stop it is the long-press-to-close gesture on the
@@ -65,9 +65,10 @@ public class VolumeOverlayService extends Service {
 
     private static final long LONGPRESS_MS = 650;
     private static final long TAP_MAX_MS = 350;
-    private static final long THEME_HOLD_MS = 5000;
+    private static final long THEME_HOLD_MS = 2000;
     private static final long NUDGE_COOLDOWN_MS = 500;
     private static final int WIDGET_MAX = 25; // this widget's own ceiling - see class doc
+    private static final int PANEL_WIDTH_DP = 150; // matches overlay_panel.xml's root width
 
     public static void start(Context ctx) {
         ContextCompat.startForegroundService(ctx, new Intent(ctx, VolumeOverlayService.class));
@@ -102,7 +103,13 @@ public class VolumeOverlayService extends Service {
     private ImageButton collapseBtn;
     private EqBarView eqBar;
     private View readoutRow;
-    private View themePopup;
+
+    // The theme popup is its own top-level overlay window (see openPanel()
+    // vs showThemePopup()) so it can sit centered on the whole screen
+    // instead of being squeezed inside the docked side panel's width.
+    private View themePopupRoot;
+    private WindowManager.LayoutParams themePopupParams;
+    private boolean themePopupAdded = false;
     private GridLayout themeGrid;
     private TextView themeCurrent;
     private final View[] themeSwatches = new View[ThemeColors.THEMES.length];
@@ -194,6 +201,7 @@ public class VolumeOverlayService extends Service {
         if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
         try { removeTabWindow(); } catch (Exception ignored) {}
         try { if (panelAdded) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
+        try { if (themePopupAdded) { wm.removeView(themePopupRoot); themePopupAdded = false; } } catch (Exception ignored) {}
         stopForeground(true);
     }
 
@@ -368,7 +376,7 @@ public class VolumeOverlayService extends Service {
         removeTabWindow();
         try {
             if (panelRoot == null) inflatePanel();
-            panelParams = newOverlayParams(dp(184), WindowManager.LayoutParams.WRAP_CONTENT);
+            panelParams = newOverlayParams(dp(PANEL_WIDTH_DP), WindowManager.LayoutParams.WRAP_CONTENT);
             positionPanel();
             wm.addView(panelRoot, panelParams);
             panelAdded = true;
@@ -392,7 +400,7 @@ public class VolumeOverlayService extends Service {
 
     private void positionPanel() {
         Point sz = screenSize();
-        int panelW = dp(184);
+        int panelW = dp(PANEL_WIDTH_DP);
         panelRoot.measure(
                 View.MeasureSpec.makeMeasureSpec(panelW, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(sz.y, View.MeasureSpec.AT_MOST));
@@ -416,21 +424,29 @@ public class VolumeOverlayService extends Service {
         nudgeBtn = panelRoot.findViewById(R.id.nudgeBtn);
         collapseBtn = panelRoot.findViewById(R.id.collapseBtn);
         eqBar = panelRoot.findViewById(R.id.eqBar);
-        themePopup = panelRoot.findViewById(R.id.themePopup);
-        themeGrid = panelRoot.findViewById(R.id.themeGrid);
-        themeCurrent = panelRoot.findViewById(R.id.themeCurrent);
-        Button themeDone = panelRoot.findViewById(R.id.themeDone);
-        ImageButton themeClose = panelRoot.findViewById(R.id.themeClose);
 
         readoutRow.setOnTouchListener(this::onThemeHoldTouch);
         collapseBtn.setOnClickListener(v -> closePanel());
         nudgeBtn.setOnClickListener(v -> onNudgeClick());
-        themeDone.setOnClickListener(v -> hideThemePopup());
-        themeClose.setOnClickListener(v -> hideThemePopup());
         eqBar.setListener(new EqBarView.Listener() {
             @Override public void onDragValue(int value0to25) { setRealVolume(value0to25); }
             @Override public void onDragEnd() { /* already applied live */ }
         });
+    }
+
+    /** Inflates the theme popup as its own top-level overlay window, separate
+     *  from the docked side panel, so it can sit centered on the whole
+     *  screen (see showThemePopup()) instead of squeezed into the panel's
+     *  150dp width. */
+    private void inflateThemePopup() {
+        themePopupRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_theme_popup, null);
+        themeGrid = themePopupRoot.findViewById(R.id.themeGrid);
+        themeCurrent = themePopupRoot.findViewById(R.id.themeCurrent);
+        Button themeDone = themePopupRoot.findViewById(R.id.themeDone);
+        ImageButton themeClose = themePopupRoot.findViewById(R.id.themeClose);
+
+        themeDone.setOnClickListener(v -> hideThemePopup());
+        themeClose.setOnClickListener(v -> hideThemePopup());
 
         populateThemeGrid();
     }
@@ -451,7 +467,7 @@ public class VolumeOverlayService extends Service {
         }
     }
 
-    // ---------------------------------------------------------- 5s hold -> theme popup
+    // ---------------------------------------------------------- 2s hold -> theme popup
 
     private float themeDownX, themeDownY;
     private boolean themeMoved;
@@ -505,9 +521,19 @@ public class VolumeOverlayService extends Service {
 
     private void showThemePopup() {
         try {
-            themePopup.setVisibility(View.VISIBLE);
+            if (themePopupAdded) return;
+            if (themePopupRoot == null) inflateThemePopup();
+            // MATCH_PARENT on both axes: the popup's own root already
+            // centers the picker card within itself (layout_gravity=
+            // "center" in overlay_theme_popup.xml), so this window just
+            // needs to cover the full screen behind it for the dim
+            // backdrop and to be centered *on the screen*, not relative
+            // to the docked side panel.
+            themePopupParams = newOverlayParams(
+                    WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            wm.addView(themePopupRoot, themePopupParams);
+            themePopupAdded = true;
             refreshThemeGridSelection();
-            positionPanel();
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "showThemePopup failed", e);
         }
@@ -515,8 +541,10 @@ public class VolumeOverlayService extends Service {
 
     private void hideThemePopup() {
         try {
-            themePopup.setVisibility(View.GONE);
-            positionPanel();
+            if (themePopupAdded) {
+                wm.removeView(themePopupRoot);
+                themePopupAdded = false;
+            }
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "hideThemePopup failed", e);
         }
@@ -584,8 +612,9 @@ public class VolumeOverlayService extends Service {
                 boolean showNudge = raw >= EqBarView.DRAG_CAP && raw < WIDGET_MAX;
                 nudgeBtn.setVisibility(showNudge ? View.VISIBLE : View.INVISIBLE);
                 collapseBtn.setRotation("right".equals(side) ? 90f : -90f);
-                if (themePopup.getVisibility() == View.VISIBLE) refreshThemeGridSelection();
+                applyPanelTheme(color);
             }
+            if (themePopupAdded) refreshThemeGridSelection();
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "refreshVisuals failed", e);
         }
@@ -609,6 +638,40 @@ public class VolumeOverlayService extends Service {
         lp.leftMargin = "left".equals(side) ? dp(8) : 0;
         lp.rightMargin = "right".equals(side) ? dp(8) : 0;
         icon.setLayoutParams(lp);
+    }
+
+    /** Re-skins the whole open panel (card, buttons, hold-progress fill) in
+     *  the current theme's volume color, not just the EQ ball - card corner
+     *  shape also flips to match whichever edge the panel is docked to,
+     *  same "flat against the edge, rounded into the screen" logic as the
+     *  tab's own shape. */
+    private void applyPanelTheme(int color) {
+        if (panelRoot == null) return;
+        View panelCard = panelRoot.findViewById(R.id.panelCard);
+        if (panelCard != null) {
+            GradientDrawable cardBg = new GradientDrawable();
+            cardBg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
+            cardBg.setCornerRadii(panelCornerRadii());
+            panelCard.setBackground(cardBg);
+        }
+        tintSmallButton(nudgeBtn, color);
+        tintSmallButton(collapseBtn, color);
+        if (holdProgressFill != null) holdProgressFill.setBackgroundColor(color);
+    }
+
+    private void tintSmallButton(View btn, int color) {
+        if (btn == null) return;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(mixColors(Color.parseColor("#DED9CC"), color, 0.35f));
+        bg.setCornerRadius(dp(7));
+        btn.setBackground(bg);
+    }
+
+    private float[] panelCornerRadii() {
+        float r = dp(18);
+        return "left".equals(side)
+                ? new float[]{0, 0, r, r, r, r, 0, 0}
+                : new float[]{r, r, 0, 0, 0, 0, r, r};
     }
 
     // ---------------------------------------------------------- helpers
