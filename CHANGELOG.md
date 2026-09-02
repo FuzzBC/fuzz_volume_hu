@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.024
+- Fixed: reinstalling/updating the app while the overlay was running showed "Stop volume overlay" on the main screen with no bubble actually visible - the install kills the old process outright (no crash, no VolumeOverlayService.onDestroy(), no chance to clear the "running" flag), so the very next launch trusted a stale "true" left over from before. FuzzVolumeApp.onCreate() now clears it unconditionally at the top - it runs exactly once per process, so it running at all is itself proof any leftover "true" can't be real. The main screen now correctly shows "Start" and auto-starts the overlay again right away (same as it would for any other fresh launch with permissions already granted).
+
 ## 1.023
 - "Volume panel height" (Size tab) is now capped at 80% of the actual screen height instead of a fixed 260dp, so it can never grow taller than the screen can sensibly show - the cap is computed live per device.
 - Size/Conf tab sliders now write to disk with a synchronous commit() instead of the async apply() - only once per drag release (not on every intermediate tick, so dragging stays smooth), and again as a safety net whenever the settings popup closes. This device's OEM battery/security manager is known to kill this app's process aggressively; an in-flight apply() isn't guaranteed to survive that, commit() is.

@@ -30,6 +30,25 @@ public class FuzzVolumeApp extends Application {
     public void onCreate() {
         super.onCreate();
         TraceLog.step(this, "FuzzVolumeApp.onCreate start");
+
+        // Application.onCreate() runs exactly once per process - if the
+        // overlay's foreground service were genuinely still alive, this
+        // process (and this Application instance) would already exist and
+        // this method could not be running again. So seeing it run at all
+        // is itself proof any "overlay_started=true" left over from before
+        // is stale, from a process that died without a clean
+        // VolumeOverlayService.onDestroy() - most commonly an app
+        // update/reinstall, which kills the old process outright with no
+        // crash and no chance for onDestroy() to run. Without this,
+        // MainActivity trusts the stale flag: shows "Stop volume overlay"
+        // for a service that isn't running, and its own auto-start on open
+        // (see MainActivity.maybeAutoStartOverlay()) skips starting a fresh
+        // one because it thinks one is already up - net result, no bubble
+        // on screen and a Stop button that does nothing.
+        try {
+            new Prefs(this).setOverlayStarted(false);
+        } catch (Exception ignored) {}
+
         final Thread.UncaughtExceptionHandler platformHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
             TraceLog.error(this, "UNCAUGHT on thread " + thread.getName(), ex);
