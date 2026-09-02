@@ -76,7 +76,12 @@ public class VolumeOverlayService extends Service {
     // Size tab slider ranges (dp) - min value + seekbar's 0-based progress.
     private static final int BUBBLE_WIDTH_MIN_DP = 36, BUBBLE_WIDTH_MAX_DP = 90;
     private static final int PANEL_WIDTH_MIN_DP = 80, PANEL_WIDTH_MAX_DP = 260; // 80 = just enough for the 40dp EQ bar + panelCard's 14dp padding on each side
-    private static final int PANEL_BAR_HEIGHT_MIN_DP = 90, PANEL_BAR_HEIGHT_MAX_DP = 260;
+    // No fixed max here - the "Volume panel height" slider's ceiling is
+    // computed live as 80% of the actual screen height (see
+    // maxPanelBarHeightDp()) so it never lets the bar grow taller than the
+    // screen can sensibly show, on any device.
+    private static final int PANEL_BAR_HEIGHT_MIN_DP = 90;
+    private static final float PANEL_BAR_HEIGHT_MAX_SCREEN_FRACTION = 0.8f;
     // The floating bubble's original proportions (52x108dp) and icon size
     // (see overlay_tab.xml history) as ratios, so resizing the bubble via
     // the Size tab scales its height and icon together instead of just its
@@ -218,7 +223,7 @@ public class VolumeOverlayService extends Service {
             dynamicColor = prefs.isDynamicColor();
             bubbleWidthDp = prefs.getBubbleWidthDp();
             panelWidthDp = prefs.getPanelWidthDp();
-            panelBarHeightDp = prefs.getPanelBarHeightDp();
+            panelBarHeightDp = Math.min(prefs.getPanelBarHeightDp(), maxPanelBarHeightDp());
             // Defensive clamp on load - Conf tab's tiers must stay ordered
             // (maxVolumeSupported >= widgetMax >= dragCap) even if a future
             // change to the defaults ever left a stale combination behind.
@@ -554,13 +559,28 @@ public class VolumeOverlayService extends Service {
         });
     }
 
-    /** Applies panelBarHeightDp (Size tab) to the already-inflated EQ bar. */
+    /** Applies panelBarHeightDp (Size tab) to the already-inflated EQ bar,
+     *  clamped to maxPanelBarHeightDp() defensively - the Size tab's own
+     *  slider already can't exceed it, but this is the one place that
+     *  actually touches the live view, so it's the right last line of
+     *  defense against a stale/larger value from Prefs (e.g. set on a
+     *  taller screen, then reused on a shorter one). */
     private void applyBarHeightLive() {
         if (eqBar == null) return;
         ViewGroup.LayoutParams lp = eqBar.getLayoutParams();
         if (lp == null) return;
-        lp.height = dp(panelBarHeightDp);
+        lp.height = dp(Math.min(panelBarHeightDp, maxPanelBarHeightDp()));
         eqBar.setLayoutParams(lp);
+    }
+
+    /** 80% of the current screen height, in dp - the "Volume panel height"
+     *  slider's ceiling, so the EQ bar can never grow taller than the
+     *  screen can sensibly show on any device. */
+    private int maxPanelBarHeightDp() {
+        Point sz = screenSize();
+        float density = getResources().getDisplayMetrics().density;
+        int screenHeightDp = Math.round(sz.y / density);
+        return Math.max(PANEL_BAR_HEIGHT_MIN_DP, Math.round(screenHeightDp * PANEL_BAR_HEIGHT_MAX_SCREEN_FRACTION));
     }
 
     /** Inflates the settings popup as its own top-level overlay window,
@@ -640,7 +660,7 @@ public class VolumeOverlayService extends Service {
     private void wireSizeTab() {
         bubbleSizeSeek.setMax(BUBBLE_WIDTH_MAX_DP - BUBBLE_WIDTH_MIN_DP);
         panelWidthSeek.setMax(PANEL_WIDTH_MAX_DP - PANEL_WIDTH_MIN_DP);
-        panelHeightSeek.setMax(PANEL_BAR_HEIGHT_MAX_DP - PANEL_BAR_HEIGHT_MIN_DP);
+        panelHeightSeek.setMax(Math.max(1, maxPanelBarHeightDp() - PANEL_BAR_HEIGHT_MIN_DP));
         syncSizeTabUI();
 
         onSeek(bubbleSizeSeek, v -> {
@@ -656,7 +676,7 @@ public class VolumeOverlayService extends Service {
             if (panelAdded) positionPanel();
         });
         onSeek(panelHeightSeek, v -> {
-            panelBarHeightDp = PANEL_BAR_HEIGHT_MIN_DP + v;
+            panelBarHeightDp = Math.min(PANEL_BAR_HEIGHT_MIN_DP + v, maxPanelBarHeightDp());
             prefs.setPanelBarHeightDp(panelBarHeightDp);
             panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
             applyBarHeightLive();
@@ -669,6 +689,7 @@ public class VolumeOverlayService extends Service {
         bubbleSizeLabel.setText("Bubble size: " + bubbleWidthDp + "dp");
         panelWidthSeek.setProgress(panelWidthDp - PANEL_WIDTH_MIN_DP);
         panelWidthLabel.setText("Volume panel width: " + panelWidthDp + "dp");
+        panelHeightSeek.setMax(Math.max(1, maxPanelBarHeightDp() - PANEL_BAR_HEIGHT_MIN_DP));
         panelHeightSeek.setProgress(panelBarHeightDp - PANEL_BAR_HEIGHT_MIN_DP);
         panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
     }

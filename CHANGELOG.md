@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.023
+- "Volume panel height" (Size tab) is now capped at 80% of the actual screen height instead of a fixed 260dp, so it can never grow taller than the screen can sensibly show - the cap is computed live per device.
+
 ## 1.022
 - Fixed: dragging the bubble across the screen's midpoint moved it to the new side but left its half-circle shape (and icon alignment) stuck on the old side until something unrelated triggered a refresh - positionTab() (called live while dragging) only moves/resizes the window, the shape itself comes from updateTabAppearance() inside refreshVisuals(), which the drag never called. Now refreshed live the moment the drag crosses sides.
 - Added a version label ("v1.XXX") under the app name on the main screen.
