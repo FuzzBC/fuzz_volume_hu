@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.026
+- New Form tab: 15 additional visual styles for the volume meter (Clear mode, Liquid fill, Dial, Speedometer, Minimal line, Chunky LED, Neumorphic, Glass, Dot column, Ring, Thermometer, Equalizer wave, Icon header, Compact pill, Retro LCD) alongside the original Classic EQ, all sharing the exact same drag behavior - only how it looks changes, never how it responds to a touch.
+- Form tab also adds independent background-shape pickers for the volume panel and for the floating bubble (Themed / Rounded / Square / Pill / Clear) - Clear removes the card/bubble background entirely; when the bubble has no background the icon itself picks up the volume color instead, so that signal isn't lost.
+- Size tab's "Bubble size" now shows a small live-scaled replica of the bubble next to the slider - the real bubble is hidden behind the panel while this popup is open, so without it the resize wasn't visible until everything closed.
+- Fixed: switching to a taller settings-popup tab (Form's list, in particular) while the popup sat low on screen could push its bottom edge past the actual display - the window resizes on a tab switch but its position wasn't being re-checked, so the last few items had nowhere on-screen to scroll into. Re-clamped on every tab switch now, not just when the popup first opens.
+
 ## 1.025
 - Conf tab now shows this device's own real media-volume ceiling under "Max volume supported" (e.g. many Samsung phones cap it at 15 steps). That's an Android/OEM hard limit no app can write past - independent of "max volume supported"/"limited to"/"when go slowly" - and was silently capping every drag/nudge below whatever those were set to, on some devices, with no explanation why.
 

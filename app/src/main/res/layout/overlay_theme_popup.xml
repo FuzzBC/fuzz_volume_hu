@@ -93,9 +93,24 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="4dp"
             android:gravity="center"
             android:padding="8dp"
             android:text="Conf"
+            android:textAllCaps="true"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#8A7A5C"
+            android:background="@drawable/bg_small_button" />
+
+        <TextView
+            android:id="@+id/tabForm"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="Form"
             android:textAllCaps="true"
             android:textSize="10sp"
             android:textStyle="bold"
@@ -204,20 +219,51 @@
             android:padding="14dp"
             android:visibility="gone">
 
-            <TextView
-                android:id="@+id/bubbleSizeLabel"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Bubble size: 52dp"
-                android:textColor="@color/ink"
-                android:textSize="12sp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <SeekBar
-                android:id="@+id/bubbleSizeSeek"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="54"
-                android:progress="16" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/bubbleSizeLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Bubble size: 52dp"
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+
+                    <SeekBar
+                        android:id="@+id/bubbleSizeSeek"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="54"
+                        android:progress="16" />
+                </LinearLayout>
+
+                <!-- Live-scaled replica of the actual floating bubble -
+                     it's the one thing this slider changes that isn't
+                     otherwise visible while this popup covers the real
+                     bubble (see VolumeOverlayService.applyBubbleSizeLive()). -->
+                <FrameLayout
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="10dp"
+                    android:background="#0A000000">
+
+                    <View
+                        android:id="@+id/bubblePreview"
+                        android:layout_width="20dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center" />
+                </FrameLayout>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/panelWidthLabel"
@@ -316,6 +362,21 @@
                 android:max="25"
                 android:progress="20" />
         </LinearLayout>
+
+        <!-- ================= FORM TAB ================= -->
+        <ScrollView
+            android:id="@+id/formTabContent"
+            android:layout_width="match_parent"
+            android:layout_height="260dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/formList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="6dp" />
+        </ScrollView>
 
     </FrameLayout>
 

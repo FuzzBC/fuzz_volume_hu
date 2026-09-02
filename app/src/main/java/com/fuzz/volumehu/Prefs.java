@@ -8,9 +8,10 @@ import android.content.SharedPreferences;
  * Description: Everything the overlay remembers between launches - which
  *              edge the tab is docked to, how far down that edge, which of
  *              the 24 color themes is active, whether that theme is dynamic
- *              (color follows volume) or a flat merge color, the popup/panel
- *              size sliders from the Size tab, the volume tiers from the
- *              Conf tab, and the settings popup's own dragged position. The
+ *              (color follows volume) or a flat merge color, which of the
+ *              16 panel forms is active (Form tab), the popup/panel size
+ *              sliders from the Size tab, the volume tiers from the Conf
+ *              tab, and the settings popup's own dragged position. The
  *              volume itself is never stored here; it's always read live
  *              from AudioManager (see VolumeOverlayService), so it can't
  *              drift from the real system value.
@@ -38,6 +39,11 @@ public class Prefs {
 
     // Theme tab
     private static final String KEY_DYNAMIC_COLOR = "dynamic_color"; // true: color follows volume (theme color -> red at max); false: flat theme color everywhere ("merge")
+
+    // Form tab
+    private static final String KEY_FORM = "panel_form"; // index into VolumeOverlayService.FORM_NAMES / EqBarView's form styles
+    private static final String KEY_PANEL_BG_SHAPE = "panel_bg_shape";   // index into VolumeOverlayService.BG_SHAPE_NAMES
+    private static final String KEY_BUBBLE_BG_SHAPE = "bubble_bg_shape"; // index into VolumeOverlayService.BG_SHAPE_NAMES
 
     // Size tab (all dp)
     private static final String KEY_BUBBLE_WIDTH = "bubble_width_dp"; // floating bubble's own size - height/icon scale with it
@@ -83,6 +89,15 @@ public class Prefs {
 
     public boolean isDynamicColor() { return sp.getBoolean(KEY_DYNAMIC_COLOR, true); }
     public void setDynamicColor(boolean dynamic) { sp.edit().putBoolean(KEY_DYNAMIC_COLOR, dynamic).commit(); }
+
+    public int getForm() { return sp.getInt(KEY_FORM, 0); }
+    public void setForm(int form) { sp.edit().putInt(KEY_FORM, form).commit(); }
+
+    public int getPanelBgShape() { return sp.getInt(KEY_PANEL_BG_SHAPE, 0); }
+    public void setPanelBgShape(int shape) { sp.edit().putInt(KEY_PANEL_BG_SHAPE, shape).commit(); }
+
+    public int getBubbleBgShape() { return sp.getInt(KEY_BUBBLE_BG_SHAPE, 0); }
+    public void setBubbleBgShape(int shape) { sp.edit().putInt(KEY_BUBBLE_BG_SHAPE, shape).commit(); }
 
     public int getBubbleWidthDp() { return sp.getInt(KEY_BUBBLE_WIDTH, DEFAULT_BUBBLE_WIDTH_DP); }
     public void setBubbleWidthDp(int dp) { sp.edit().putInt(KEY_BUBBLE_WIDTH, dp).commit(); }

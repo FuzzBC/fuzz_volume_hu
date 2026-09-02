@@ -85,9 +85,14 @@
             android:contentDescription="Push past 20"
             android:visibility="invisible" />
 
+        <!-- match_parent, not a fixed 40dp column - most forms (Form tab)
+             are a narrow centered bar like before, but round ones (Dial,
+             Speedometer, Ring) need the panel's actual width to draw a
+             properly sized circle/arc. EqBarView centers narrow forms
+             itself; see its formsUseFullWidth(). -->
         <com.fuzz.volumehu.widget.EqBarView
             android:id="@+id/eqBar"
-            android:layout_width="40dp"
+            android:layout_width="match_parent"
             android:layout_height="150dp" />
 
         <!-- Collapse (retract) arrow: rotated in code to point at whichever

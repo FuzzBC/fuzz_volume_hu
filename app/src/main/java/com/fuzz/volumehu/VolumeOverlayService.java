@@ -33,6 +33,7 @@ import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -92,6 +93,10 @@ public class VolumeOverlayService extends Service {
     // The settings popup card's own size is fixed - only the bubble and
     // the volume panel are user-resizable (Size tab).
     private static final int SETTINGS_POPUP_DIAMETER_DP = 260;
+
+    /** Panel/bubble background shapes - Form tab. Index 4 ("Clear") means no
+     *  background drawable at all - see buildBubbleDrawable()/applyPanelTheme(). */
+    private static final String[] BG_SHAPE_NAMES = {"Themed", "Rounded", "Square", "Pill", "Clear"};
     // Conf tab slider range (volume units) for "max volume supported" - the
     // other two tiers ("limited to", "when go slowly") are bounded by
     // whichever tier sits directly above them instead of a fixed range.
@@ -116,6 +121,9 @@ public class VolumeOverlayService extends Service {
     private float vpos;
     private int themeIndex;
     private boolean dynamicColor;      // Theme tab: color follows volume vs. flat merge color
+    private int formIndex;             // Form tab: index into EqBarView.FORM_NAMES
+    private int panelBgShape;          // Form tab: index into BG_SHAPE_NAMES
+    private int bubbleBgShape;         // Form tab: index into BG_SHAPE_NAMES
     private int bubbleWidthDp;         // Size tab - floating bubble's own size (height/icon scale with it)
     private int panelWidthDp;          // Size tab
     private int panelBarHeightDp;      // Size tab
@@ -169,11 +177,18 @@ public class VolumeOverlayService extends Service {
     private CheckBox dynamicCheck;
 
     // Popup tabs
-    private TextView tabTheme, tabSize, tabConf;
-    private View themeTabContent, sizeTabContent, confTabContent;
+    private TextView tabTheme, tabSize, tabConf, tabForm;
+    private View themeTabContent, sizeTabContent, confTabContent, formTabContent;
+
+    // Form tab
+    private LinearLayout formList;
+    private final View[] formRows = new View[EqBarView.FORM_NAMES.length];
+    private final View[] panelBgRows = new View[BG_SHAPE_NAMES.length];
+    private final View[] bubbleBgRows = new View[BG_SHAPE_NAMES.length];
 
     // Size tab
     private TextView bubbleSizeLabel, panelWidthLabel, panelHeightLabel;
+    private View bubblePreview;
     private SeekBar bubbleSizeSeek, panelWidthSeek, panelHeightSeek;
 
     // Conf tab
@@ -221,6 +236,9 @@ public class VolumeOverlayService extends Service {
             vpos = prefs.getVpos();
             themeIndex = prefs.getTheme();
             dynamicColor = prefs.isDynamicColor();
+            formIndex = clampInt(prefs.getForm(), 0, EqBarView.FORM_NAMES.length - 1);
+            panelBgShape = clampInt(prefs.getPanelBgShape(), 0, BG_SHAPE_NAMES.length - 1);
+            bubbleBgShape = clampInt(prefs.getBubbleBgShape(), 0, BG_SHAPE_NAMES.length - 1);
             bubbleWidthDp = prefs.getBubbleWidthDp();
             panelWidthDp = prefs.getPanelWidthDp();
             panelBarHeightDp = Math.min(prefs.getPanelBarHeightDp(), maxPanelBarHeightDp());
@@ -559,6 +577,7 @@ public class VolumeOverlayService extends Service {
         applyBarHeightLive();
         eqBar.setVolMax(maxVolumeSupported);
         eqBar.setDragCap(dragCap);
+        eqBar.setFormIndex(formIndex);
 
         readoutRow.setOnTouchListener(this::onThemeHoldTouch);
         collapseBtn.setOnClickListener(v -> closePanel());
@@ -610,14 +629,18 @@ public class VolumeOverlayService extends Service {
         tabTheme = themePopupRoot.findViewById(R.id.tabTheme);
         tabSize = themePopupRoot.findViewById(R.id.tabSize);
         tabConf = themePopupRoot.findViewById(R.id.tabConf);
+        tabForm = themePopupRoot.findViewById(R.id.tabForm);
         themeTabContent = themePopupRoot.findViewById(R.id.themeTabContent);
         sizeTabContent = themePopupRoot.findViewById(R.id.sizeTabContent);
         confTabContent = themePopupRoot.findViewById(R.id.confTabContent);
+        formTabContent = themePopupRoot.findViewById(R.id.formTabContent);
+        formList = themePopupRoot.findViewById(R.id.formList);
 
         bubbleSizeLabel = themePopupRoot.findViewById(R.id.bubbleSizeLabel);
         panelWidthLabel = themePopupRoot.findViewById(R.id.panelWidthLabel);
         panelHeightLabel = themePopupRoot.findViewById(R.id.panelHeightLabel);
         bubbleSizeSeek = themePopupRoot.findViewById(R.id.bubbleSizeSeek);
+        bubblePreview = themePopupRoot.findViewById(R.id.bubblePreview);
         panelWidthSeek = themePopupRoot.findViewById(R.id.panelWidthSeek);
         panelHeightSeek = themePopupRoot.findViewById(R.id.panelHeightSeek);
 
@@ -646,6 +669,7 @@ public class VolumeOverlayService extends Service {
         tabTheme.setOnClickListener(v -> selectSettingsTab(0));
         tabSize.setOnClickListener(v -> selectSettingsTab(1));
         tabConf.setOnClickListener(v -> selectSettingsTab(2));
+        tabForm.setOnClickListener(v -> selectSettingsTab(3));
 
         dynamicCheck.setChecked(dynamicColor);
         dynamicCheck.setOnCheckedChangeListener((btn, checked) -> {
@@ -657,18 +681,46 @@ public class VolumeOverlayService extends Service {
         populateThemeGrid();
         wireSizeTab();
         wireConfTab();
+        populateFormList();
     }
 
     private void selectSettingsTab(int index) {
         themeTabContent.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
         sizeTabContent.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
         confTabContent.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
+        formTabContent.setVisibility(index == 3 ? View.VISIBLE : View.GONE);
         styleSettingsTab(tabTheme, index == 0);
         styleSettingsTab(tabSize, index == 1);
         styleSettingsTab(tabConf, index == 2);
+        styleSettingsTab(tabForm, index == 3);
         // Each tab's content is a different height - re-layout the window
         // now that tabContent's measured height has changed.
-        if (themePopupAdded) wm.updateViewLayout(themePopupRoot, themePopupParams);
+        if (themePopupAdded) {
+            wm.updateViewLayout(themePopupRoot, themePopupParams);
+            // The window resizes here, but its Y position doesn't move on
+            // its own - if the popup was sitting low on screen (default
+            // centering, or a remembered drag position) and this tab is
+            // taller than the one before it (Form's 16-row list vs Theme's
+            // grid, say), the new bottom edge can run past the actual
+            // screen height with nothing able to scroll into space that
+            // isn't there. Re-clamp once the resize has actually taken
+            // effect (post(), not immediately - updateViewLayout()'s
+            // relayout happens on the next traversal, so getHeight() here
+            // would still read the old, pre-switch height).
+            themePopupRoot.post(() -> {
+                try {
+                    if (!themePopupAdded) return;
+                    int actualH = themePopupRoot.getHeight();
+                    if (actualH <= 0) return;
+                    Point sz = screenSize();
+                    int clampedY = clampInt(themePopupParams.y, 0, Math.max(0, sz.y - actualH));
+                    if (clampedY != themePopupParams.y) {
+                        themePopupParams.y = clampedY;
+                        wm.updateViewLayout(themePopupRoot, themePopupParams);
+                    }
+                } catch (Exception ignored) {}
+            });
+        }
     }
 
     private void styleSettingsTab(TextView tab, boolean selected) {
@@ -712,13 +764,12 @@ public class VolumeOverlayService extends Service {
         panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
     }
 
-    /** Live-resizes the floating bubble (and its icon, via refreshVisuals()
-     *  -> updateTabAppearance()) as the Size tab's slider moves. The tab
-     *  window is usually hidden while this popup is open (the panel took
-     *  its place), so the resize itself is applied to tabParams right away
-     *  but the visual effect on the tab only appears once the panel closes
-     *  and addTabWindow() rebuilds it - positionTab() is still called
-     *  defensively in case a future path has the tab and popup up together. */
+    /** Live-resizes the floating bubble as the Size tab's slider moves. The
+     *  tab window is usually hidden while this popup is open (the panel
+     *  took its place) - positionTab() still applies the new size to
+     *  tabParams right away for whenever the tab window reappears, but the
+     *  visible feedback while dragging comes from updateBubblePreview()
+     *  (via refreshVisuals()), the small live replica next to the slider. */
     private void applyBubbleSizeLive() {
         positionTab();
         refreshVisuals();
@@ -977,7 +1028,7 @@ public class VolumeOverlayService extends Service {
 
             wm.addView(themePopupRoot, themePopupParams);
             themePopupAdded = true;
-            refreshThemeGridSelection();
+            refreshVisuals(); // syncs the theme grid selection + bubble-size preview to the current state right away, not just after the next change
             syncSizeTabUI();
             syncConfTabUI();
         } catch (Exception e) {
@@ -1047,6 +1098,94 @@ public class VolumeOverlayService extends Service {
         if (themeCurrent != null) themeCurrent.setText(ThemeColors.THEMES[themeIndex].name);
     }
 
+    // ---------------------------------------------------------- Form tab
+
+    private void populateFormList() {
+        formList.removeAllViews();
+
+        String[] names = EqBarView.FORM_NAMES;
+        for (int i = 0; i < names.length; i++) {
+            final int idx = i;
+            formRows[i] = addPickerRow(formList, names[i], () -> {
+                formIndex = idx;
+                prefs.setForm(idx);
+                if (eqBar != null) eqBar.setFormIndex(idx);
+                refreshFormListSelection();
+            });
+        }
+
+        addPickerSectionHeader(formList, "Panel background");
+        for (int i = 0; i < BG_SHAPE_NAMES.length; i++) {
+            final int idx = i;
+            panelBgRows[i] = addPickerRow(formList, BG_SHAPE_NAMES[i], () -> {
+                panelBgShape = idx;
+                prefs.setPanelBgShape(idx);
+                refreshFormListSelection();
+                refreshVisuals();
+            });
+        }
+
+        addPickerSectionHeader(formList, "Bubble background");
+        for (int i = 0; i < BG_SHAPE_NAMES.length; i++) {
+            final int idx = i;
+            bubbleBgRows[i] = addPickerRow(formList, BG_SHAPE_NAMES[i], () -> {
+                bubbleBgShape = idx;
+                prefs.setBubbleBgShape(idx);
+                refreshFormListSelection();
+                refreshVisuals();
+            });
+        }
+
+        refreshFormListSelection();
+    }
+
+    private void addPickerSectionHeader(LinearLayout container, String text) {
+        TextView header = new TextView(themedCtx);
+        header.setText(text);
+        header.setAllCaps(true);
+        header.setTextSize(10);
+        header.setTextColor(Color.parseColor("#8A7A5C"));
+        header.setPadding(dp(10), dp(14), dp(10), dp(4));
+        container.addView(header);
+    }
+
+    private TextView addPickerRow(LinearLayout container, String name, Runnable onSelect) {
+        TextView row = new TextView(themedCtx);
+        row.setText(name);
+        row.setTextSize(13);
+        row.setPadding(dp(10), dp(9), dp(10), dp(9));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(2);
+        row.setLayoutParams(lp);
+        row.setOnClickListener(v -> {
+            try {
+                onSelect.run();
+            } catch (Exception e) {
+                android.util.Log.e("VolumeOverlayService", "picker row click failed", e);
+            }
+        });
+        container.addView(row);
+        return row;
+    }
+
+    private void refreshFormListSelection() {
+        styleFormRows(formRows, formIndex);
+        styleFormRows(panelBgRows, panelBgShape);
+        styleFormRows(bubbleBgRows, bubbleBgShape);
+    }
+
+    private void styleFormRows(View[] rows, int selectedIndex) {
+        for (int i = 0; i < rows.length; i++) {
+            if (!(rows[i] instanceof TextView)) continue;
+            TextView row = (TextView) rows[i];
+            boolean selected = i == selectedIndex;
+            row.setBackgroundResource(selected ? R.drawable.bg_done_button : R.drawable.bg_small_button);
+            row.setTextColor(selected ? ContextCompat.getColor(this, R.color.cream) : Color.parseColor("#3A2F1C"));
+            row.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
+    }
+
     // ---------------------------------------------------------- Shared visual refresh
 
     // The most frequently-called shared method (every volume change, theme
@@ -1070,7 +1209,10 @@ public class VolumeOverlayService extends Service {
                 collapseBtn.setRotation("right".equals(side) ? 90f : -90f);
                 applyPanelTheme(color);
             }
-            if (themePopupAdded) refreshThemeGridSelection();
+            if (themePopupAdded) {
+                refreshThemeGridSelection();
+                updateBubblePreview(color);
+            }
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "refreshVisuals failed", e);
         }
@@ -1090,18 +1232,13 @@ public class VolumeOverlayService extends Service {
     }
 
     private void updateTabAppearance(int volumeColor) {
-        float r = dp(999);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(mixColors(Color.parseColor("#E6E2D8"), volumeColor, 0.4f));
-        if ("left".equals(side)) {
-            bg.setCornerRadii(new float[]{0, 0, r, r, r, r, 0, 0});
-        } else {
-            bg.setCornerRadii(new float[]{r, r, 0, 0, 0, 0, r, r});
-        }
+        GradientDrawable bg = buildBubbleDrawable(bubbleBgShape, volumeColor);
         tabRoot.setBackground(bg);
 
         ImageView icon = tabRoot.findViewById(R.id.tabIcon);
-        icon.setColorFilter(Color.parseColor("#77592A"));
+        // Clear has no background to carry the volume color - tint the icon
+        // itself instead so that signal isn't lost entirely.
+        icon.setColorFilter(bubbleBgShape == 4 ? volumeColor : Color.parseColor("#77592A"));
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) icon.getLayoutParams();
         int iconSize = dp(Math.round(bubbleWidthDp * TAB_ICON_RATIO));
         lp.width = iconSize;
@@ -1112,23 +1249,80 @@ public class VolumeOverlayService extends Service {
         icon.setLayoutParams(lp);
     }
 
+    /** Builds the bubble's background - shared between the real floating
+     *  bubble and its live preview on the Size tab (see updateBubblePreview()).
+     *  Null means "Clear" - no drawable, caller must handle that (setBackground(null) is fine). */
+    private GradientDrawable buildBubbleDrawable(int shape, int volumeColor) {
+        if (shape == 4) return null; // Clear
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(mixColors(Color.parseColor("#E6E2D8"), volumeColor, 0.4f));
+        float r999 = dp(999);
+        switch (shape) {
+            case 1: bg.setCornerRadius(dp(14)); break; // Rounded
+            case 2: bg.setCornerRadius(0); break; // Square
+            case 3: bg.setCornerRadius(r999); break; // Pill
+            default: // Themed - flat against the docked edge, rounded facing the screen
+                if ("left".equals(side)) bg.setCornerRadii(new float[]{0, 0, r999, r999, r999, r999, 0, 0});
+                else bg.setCornerRadii(new float[]{r999, r999, 0, 0, 0, 0, r999, r999});
+        }
+        return bg;
+    }
+
     /** Re-skins the whole open panel (card, buttons, hold-progress fill) in
      *  the current theme's volume color, not just the EQ ball - card corner
-     *  shape also flips to match whichever edge the panel is docked to,
-     *  same "flat against the edge, rounded into the screen" logic as the
-     *  tab's own shape. */
+     *  shape (Form tab's "Panel background") also flips to match whichever
+     *  edge the panel is docked to when set to Themed, same "flat against
+     *  the edge, rounded into the screen" logic as the bubble's own shape. */
     private void applyPanelTheme(int color) {
         if (panelRoot == null) return;
         View panelCard = panelRoot.findViewById(R.id.panelCard);
         if (panelCard != null) {
-            GradientDrawable cardBg = new GradientDrawable();
-            cardBg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
-            cardBg.setCornerRadii(panelCornerRadii());
-            panelCard.setBackground(cardBg);
+            if (panelBgShape == 4) {
+                panelCard.setBackground(null); // Clear
+            } else {
+                GradientDrawable cardBg = new GradientDrawable();
+                cardBg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
+                switch (panelBgShape) {
+                    case 1: cardBg.setCornerRadius(dp(18)); break; // Rounded
+                    case 2: cardBg.setCornerRadius(0); break; // Square
+                    case 3: cardBg.setCornerRadius(dp(999)); break; // Pill
+                    default: cardBg.setCornerRadii(panelCornerRadii()); // Themed
+                }
+                panelCard.setBackground(cardBg);
+            }
         }
         tintSmallButton(nudgeBtn, color);
         tintSmallButton(collapseBtn, color);
         if (holdProgressFill != null) holdProgressFill.setBackgroundColor(color);
+    }
+
+    /** Live-scaled replica of the actual floating bubble, shown on the Size
+     *  tab next to "Bubble size" - the real bubble is hidden behind the
+     *  panel/popup while this is open, so without this the slider's effect
+     *  on the bubble's own size wouldn't be visible until everything closes. */
+    private void updateBubblePreview(int color) {
+        if (bubblePreview == null) return;
+        try {
+            float scale = 0.5f;
+            int maxPx = dp(50); // stay inside the 56dp preview box
+            int pw = Math.round(dp(bubbleWidthDp) * scale);
+            int ph = Math.round(dp(bubbleHeightDp()) * scale);
+            if (ph > maxPx) {
+                float s = maxPx / (float) ph;
+                pw = Math.round(pw * s);
+                ph = Math.round(ph * s);
+            }
+            ViewGroup.LayoutParams lp = bubblePreview.getLayoutParams();
+            if (lp != null) {
+                lp.width = Math.max(dp(6), pw);
+                lp.height = Math.max(dp(6), ph);
+                bubblePreview.setLayoutParams(lp);
+            }
+            GradientDrawable d = buildBubbleDrawable(bubbleBgShape, color);
+            bubblePreview.setBackground(d);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "updateBubblePreview failed", e);
+        }
     }
 
     private void tintSmallButton(View btn, int color) {
