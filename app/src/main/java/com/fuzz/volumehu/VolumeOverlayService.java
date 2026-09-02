@@ -422,8 +422,17 @@ public class VolumeOverlayService extends Service {
                 if (tabMoved) {
                     Point sz = screenSize();
                     vpos = clampFloat(tabDownVpos + (dy / sz.y) * 100f, 10f, 90f);
-                    side = event.getRawX() > sz.x / 2f ? "right" : "left";
+                    String newSide = event.getRawX() > sz.x / 2f ? "right" : "left";
+                    boolean sideChanged = !newSide.equals(side);
+                    side = newSide;
                     positionTab();
+                    // positionTab() only moves/resizes the window - the half-circle
+                    // shape itself (flat edge vs rounded edge) and the icon's side
+                    // alignment come from updateTabAppearance(), which only runs
+                    // inside refreshVisuals(). Without this, dragging across the
+                    // midpoint moved the tab but left its old shape/icon position
+                    // stuck until something unrelated (a volume change) refreshed it.
+                    if (sideChanged) refreshVisuals();
                 }
                 return true;
             }
