@@ -177,7 +177,7 @@ public class VolumeOverlayService extends Service {
     private SeekBar bubbleSizeSeek, panelWidthSeek, panelHeightSeek;
 
     // Conf tab
-    private TextView confMaxLabel, confLimitLabel, confSlowLabel;
+    private TextView confMaxLabel, confLimitLabel, confSlowLabel, confDeviceMaxHint;
     private SeekBar confMaxSeek, confLimitSeek, confSlowSeek;
 
     // Settings popup drag handle
@@ -624,9 +624,20 @@ public class VolumeOverlayService extends Service {
         confMaxLabel = themePopupRoot.findViewById(R.id.confMaxLabel);
         confLimitLabel = themePopupRoot.findViewById(R.id.confLimitLabel);
         confSlowLabel = themePopupRoot.findViewById(R.id.confSlowLabel);
+        confDeviceMaxHint = themePopupRoot.findViewById(R.id.confDeviceMaxHint);
         confMaxSeek = themePopupRoot.findViewById(R.id.confMaxSeek);
         confLimitSeek = themePopupRoot.findViewById(R.id.confLimitSeek);
         confSlowSeek = themePopupRoot.findViewById(R.id.confSlowSeek);
+
+        // This device's own real ceiling for media volume - Android/the
+        // OEM sets this (e.g. many Samsung phones cap STREAM_MUSIC at 15
+        // steps), and it's a hard limit no app can write past, completely
+        // independent of "max volume supported" above. Shown once so a
+        // configured 40/25/20 that's silently capped lower on THIS device
+        // doesn't look like the app ignoring its own settings.
+        try {
+            confDeviceMaxHint.setText("This device's own real limit: " + getStreamMax());
+        } catch (Exception ignored) {}
 
         themeDone.setOnClickListener(v -> hideThemePopup());
         themeClose.setOnClickListener(v -> hideThemePopup());

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.025
+- Conf tab now shows this device's own real media-volume ceiling under "Max volume supported" (e.g. many Samsung phones cap it at 15 steps). That's an Android/OEM hard limit no app can write past - independent of "max volume supported"/"limited to"/"when go slowly" - and was silently capping every drag/nudge below whatever those were set to, on some devices, with no explanation why.
+
 ## 1.024
 - Fixed: reinstalling/updating the app while the overlay was running showed "Stop volume overlay" on the main screen with no bubble actually visible - the install kills the old process outright (no crash, no VolumeOverlayService.onDestroy(), no chance to clear the "running" flag), so the very next launch trusted a stale "true" left over from before. FuzzVolumeApp.onCreate() now clears it unconditionally at the top - it runs exactly once per process, so it running at all is itself proof any leftover "true" can't be real. The main screen now correctly shows "Start" and auto-starts the overlay again right away (same as it would for any other fresh launch with permissions already granted).
 
