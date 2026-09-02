@@ -558,20 +558,119 @@ public class VolumeOverlayService extends Service {
     // ---------------------------------------------------------- Panel window
 
     private void openPanel() {
-        removeTabWindow();
         try {
             addPanelBackdrop(); // added first so panelRoot (added next) draws on top and keeps its own touches
             if (panelRoot == null) inflatePanel();
             panelParams = newOverlayParams(dp(panelWidthDp), WindowManager.LayoutParams.WRAP_CONTENT);
-            positionPanel();
+            positionPanel(); // computes the FINAL x/y/width into panelParams and measures panelRoot for its height
+            int endW = panelParams.width;
+            int endH = panelRoot.getMeasuredHeight();
+            int endX = panelParams.x;
+            int endY = panelParams.y;
+
+            // Shape-morph open: the bubble's own current geometry is the
+            // animation's starting point - capture it before removeTabWindow()
+            // takes it away. openPanel() is only ever reached with the tab
+            // actually showing (a tap on it, or maybePeekPanel()'s own
+            // tabAdded check), so tabParams reflects it; the fallback to the
+            // end geometry only matters if that ever stops being true.
+            int startW = tabAdded && tabParams != null ? tabParams.width : endW;
+            int startH = tabAdded && tabParams != null ? tabParams.height : endH;
+            int startX = tabAdded && tabParams != null ? tabParams.x : endX;
+            int startY = tabAdded && tabParams != null ? tabParams.y : endY;
+
+            removeTabWindow();
+
+            panelParams.width = startW;
+            panelParams.height = startH;
+            panelParams.x = startX;
+            panelParams.y = startY;
             wm.addView(panelRoot, panelParams);
             panelAdded = true;
-            refreshVisuals();
+            refreshVisuals(); // correct readout/color/shape from the first frame - just invisible until the content cross-fade catches up
+
+            animateMorphOpen(startW, startH, startX, startY, endW, endH, endX, endY);
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "openPanel failed", e);
             removePanelBackdrop();
             addTabWindow(); // fall back to just the tab rather than leaving nothing on screen
         }
+    }
+
+    /** "Grow from bubble" open transition: one window (panelRoot itself,
+     *  already carrying the bubble's own geometry when this starts - see
+     *  openPanel()) is animated from that geometry to the panel's own,
+     *  its background's corner radii morphing from the bubble's fully
+     *  rounded shape to the panel's own (panelCornerRadii()) in lockstep -
+     *  the same element stretching, not a crossfade between two. The panel
+     *  card's actual content (readout/eqBar/buttons) can't itself morph
+     *  from a bubble - it cross-fades in over the back half of the run. */
+    private void animateMorphOpen(int startW, int startH, int startX, int startY,
+                                   int endW, int endH, int endX, int endY) {
+        try {
+            int color = colorForCurrent(getRawVolume());
+            View panelCard = panelRoot.findViewById(R.id.panelCard);
+            float bubbleRadius = dp(999);
+            float[] endRadii = panelCornerRadii();
+
+            android.animation.ValueAnimator anim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            anim.setDuration(340);
+            anim.setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f));
+            anim.addUpdateListener(a -> {
+                try {
+                    float t = (float) a.getAnimatedValue();
+                    panelParams.width = Math.round(startW + (endW - startW) * t);
+                    panelParams.height = Math.round(startH + (endH - startH) * t);
+                    panelParams.x = Math.round(startX + (endX - startX) * t);
+                    panelParams.y = Math.round(startY + (endY - startY) * t);
+                    if (panelAdded) wm.updateViewLayout(panelRoot, panelParams);
+
+                    if (panelCard != null) {
+                        GradientDrawable bg = new GradientDrawable();
+                        bg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
+                        float[] radii = new float[8];
+                        for (int i = 0; i < 8; i++) radii[i] = bubbleRadius + (endRadii[i] - bubbleRadius) * t;
+                        bg.setCornerRadii(radii);
+                        panelCard.setBackground(bg);
+
+                        if (panelCard instanceof ViewGroup) {
+                            float contentAlpha = Math.max(0f, Math.min(1f, (t - 0.35f) / 0.65f));
+                            ViewGroup vg = (ViewGroup) panelCard;
+                            for (int i = 0; i < vg.getChildCount(); i++) vg.getChildAt(i).setAlpha(contentAlpha);
+                        }
+                    }
+                } catch (Exception ignored) {}
+            });
+            anim.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator animation) {
+                    settleMorphOpen(panelCard, endW, endX, endY);
+                }
+            });
+            anim.start();
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "animateMorphOpen failed", e);
+            settleMorphOpen(panelRoot.findViewById(R.id.panelCard), endW, endX, endY);
+        }
+    }
+
+    /** Snaps the panel to its real final state - WRAP_CONTENT height
+     *  (auto-resizes correctly again for any later Size tab change) and
+     *  full content opacity, then refreshVisuals() restores the real
+     *  themed background/shape cleanly instead of the animation's
+     *  last interpolated frame. */
+    private void settleMorphOpen(View panelCard, int endW, int endX, int endY) {
+        try {
+            if (panelCard instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) panelCard;
+                for (int i = 0; i < vg.getChildCount(); i++) vg.getChildAt(i).setAlpha(1f);
+            }
+            panelParams.width = endW;
+            panelParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            panelParams.x = endX;
+            panelParams.y = endY;
+            if (panelAdded) wm.updateViewLayout(panelRoot, panelParams);
+            refreshVisuals();
+        } catch (Exception ignored) {}
     }
 
     private void closePanel() {

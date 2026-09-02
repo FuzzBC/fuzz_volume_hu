@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.031
+- Tapping the bubble now grows it open instead of instantly swapping to the panel - one window animating from the bubble's own size/position/shape to the panel's, its corner radii morphing from the bubble's fully rounded edge to the panel's own shape in lockstep, with the panel's actual content (readout/EQ bar/buttons) cross-fading in over the back half of the ~340ms run. Closing (collapse arrow, tap-outside, long-press) is unchanged - still instant; ask if you want that animated to match.
+
 ## 1.030
 - Fixed: with "Block system volume popup" on, holding a volume button down only ever produced a single step, no matter how long it was held. An accessibility key filter sits ahead of the normal focused-window input queue, and Android's own key-repeat generation is tied to that queue - not guaranteed to reach a filter intercepting earlier, and in practice never did. VolumeKeyAccessibilityService now runs its own repeat timer instead of depending on OS-generated repeat events: one immediate step on a tap, then repeated steps every 130ms once held past 400ms, until release.
 
