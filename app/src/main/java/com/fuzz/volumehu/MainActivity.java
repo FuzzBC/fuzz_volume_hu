@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
                 android.util.Log.e("MainActivity", "toggle overlay failed", e);
                 Toast.makeText(this, "Couldn't start the overlay - see logs.", Toast.LENGTH_LONG).show();
             }
-            refreshStatus();
+            refreshStatusSoon();
         });
 
         batteryOptBtn.setOnClickListener(v -> {
@@ -205,7 +205,28 @@ public class MainActivity extends AppCompatActivity {
         if (!canDrawOverlays() || !notificationsGranted()) return;
         TraceLog.step(this, "auto-starting overlay on app open");
         VolumeOverlayService.start(this);
+        refreshStatusSoon();
+    }
+
+    /**
+     * VolumeOverlayService.start()/stop() only *request* a state change -
+     * the flag refreshStatus() actually reads (Prefs.wasOverlayStarted())
+     * doesn't flip until the service's own onCreate()/onDestroy() runs a
+     * moment later, on a separate dispatch. Calling refreshStatus() only
+     * once, immediately after start()/stop(), reliably shows the OLD
+     * state - "running" right after Stop, "stopped" right after Start -
+     * which reads as backwards even though neither string is actually
+     * wired wrong. This refreshes right away (so the screen doesn't feel
+     * unresponsive) and again once the dispatch has almost certainly
+     * landed, to correct itself.
+     */
+    private void refreshStatusSoon() {
         refreshStatus();
+        new android.os.Handler(getMainLooper()).postDelayed(() -> {
+            try {
+                if (!isFinishing() && !isDestroyed()) refreshStatus();
+            } catch (Exception ignored) {}
+        }, 400);
     }
 
     private boolean notificationsGranted() {
