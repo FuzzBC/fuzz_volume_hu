@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.030
+- Fixed: with "Block system volume popup" on, holding a volume button down only ever produced a single step, no matter how long it was held. An accessibility key filter sits ahead of the normal focused-window input queue, and Android's own key-repeat generation is tied to that queue - not guaranteed to reach a filter intercepting earlier, and in practice never did. VolumeKeyAccessibilityService now runs its own repeat timer instead of depending on OS-generated repeat events: one immediate step on a tap, then repeated steps every 130ms once held past 400ms, until release.
+
 ## 1.029
 - Fixed: the main screen's "widget running"/"widget stopped" status (and Start/Stop button label) could show the old state right after tapping it, or right after the overlay auto-started on app open - VolumeOverlayService.start()/stop() only request the change, the flag the status text reads doesn't actually flip until the service's own onCreate()/onDestroy() runs a moment later. Neither string was wired backwards; the status is refreshed again shortly after now, to catch the settled state instead of a stale one.
 

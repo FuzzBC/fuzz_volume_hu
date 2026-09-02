@@ -2,7 +2,10 @@ package com.fuzz.volumehu;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -24,6 +27,23 @@ import android.view.accessibility.AccessibilityEvent;
  *              maybePeekPanel() for the "open for 2s, then close" half of
  *              this feature.
  *
+ *              Holding the button down: an accessibility key filter sits
+ *              *before* the normal focused-window input queue, and the
+ *              OS's own key-repeat generation is tied to that queue, not
+ *              guaranteed to reach a filter intercepting ahead of it - in
+ *              testing, a held button only ever delivered the single
+ *              initial ACTION_DOWN with no further repeats, which felt like
+ *              volume "crawling" no matter how long the button stayed
+ *              down. So this owns its own repeat timer instead of
+ *              depending on OS-generated repeat events at all: one
+ *              immediate step on the initial press (so a quick tap is
+ *              exactly one step), then - if still held past
+ *              INITIAL_REPEAT_DELAY_MS - repeated steps every
+ *              REPEAT_INTERVAL_MS until ACTION_UP. If the OS *does* also
+ *              deliver its own repeat DOWN events for the same direction
+ *              while already held, those are ignored (this loop already
+ *              covers it) rather than risking a double-step.
+ *
  *              Enabling this service (Android Settings > Accessibility)
  *              only makes it *eligible* to run - it checks
  *              Prefs.isBlockNativeVolumeUi() fresh on every key press and
@@ -35,6 +55,20 @@ import android.view.accessibility.AccessibilityEvent;
  * Date:        2026-09-03
  */
 public class VolumeKeyAccessibilityService extends AccessibilityService {
+
+    private static final long INITIAL_REPEAT_DELAY_MS = 400;
+    private static final long REPEAT_INTERVAL_MS = 130;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    /** 0 = no key currently held; otherwise AudioManager.ADJUST_RAISE/LOWER for whichever is. */
+    private int heldDirection = 0;
+    private final Runnable repeatRunnable = new Runnable() {
+        @Override public void run() {
+            if (heldDirection == 0) return;
+            applyStep(heldDirection);
+            handler.postDelayed(this, REPEAT_INTERVAL_MS);
+        }
+    };
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -55,25 +89,45 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
                 return super.onKeyEvent(event);
             }
             if (!new Prefs(this).isBlockNativeVolumeUi()) {
-                return super.onKeyEvent(event); // feature off - let Android handle the key exactly as normal
+                stopRepeating(); // turned off mid-press - don't leave a stray loop running
+                return super.onKeyEvent(event);
             }
+
+            int direction = code == KeyEvent.KEYCODE_VOLUME_UP
+                    ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER;
+
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                // Repeat count > 0 while the key is held down still arrives
-                // as ACTION_DOWN (not a separate event type), so a held
-                // button naturally keeps stepping the volume here too,
-                // same as the system's own long-press behavior would.
-                AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-                if (am != null) {
-                    int direction = code == KeyEvent.KEYCODE_VOLUME_UP
-                            ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER;
-                    am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0);
+                if (heldDirection != direction) {
+                    heldDirection = direction;
+                    applyStep(direction); // instant feedback for a plain tap
+                    handler.removeCallbacks(repeatRunnable);
+                    handler.postDelayed(repeatRunnable, INITIAL_REPEAT_DELAY_MS);
                 }
+                // else: this is either our own already-running loop's
+                // effect or an OS repeat for the same direction we're
+                // already covering - either way, nothing new to do.
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                if (heldDirection == direction) stopRepeating();
             }
-            return true; // consume both DOWN and UP - the system never processes this key at all
+            return true; // consume - the system never processes this key at all
         } catch (Exception e) {
             android.util.Log.e("VolumeKeyAccessibilityService", "onKeyEvent failed", e);
             return super.onKeyEvent(event);
         }
+    }
+
+    private void applyStep(int direction) {
+        try {
+            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeKeyAccessibilityService", "applyStep failed", e);
+        }
+    }
+
+    private void stopRepeating() {
+        heldDirection = 0;
+        handler.removeCallbacks(repeatRunnable);
     }
 
     @Override
@@ -83,5 +137,12 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
             TraceLog.step(this, "VolumeKeyAccessibilityService connected");
         } catch (Exception ignored) {
         }
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        // Accessibility got disabled (or the app is being torn down) mid-hold - don't leave the timer running.
+        stopRepeating();
+        return super.onUnbind(intent);
     }
 }
