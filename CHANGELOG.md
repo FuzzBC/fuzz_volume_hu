@@ -2,6 +2,7 @@
 
 ## 1.022
 - Fixed: dragging the bubble across the screen's midpoint moved it to the new side but left its half-circle shape (and icon alignment) stuck on the old side until something unrelated triggered a refresh - positionTab() (called live while dragging) only moves/resizes the window, the shape itself comes from updateTabAppearance() inside refreshVisuals(), which the drag never called. Now refreshed live the moment the drag crosses sides.
+- Added a version label ("v1.XXX") under the app name on the main screen.
 
 ## 1.021
 - Tap outside the panel (anywhere else on screen) now collapses it back to the bubble - same as the collapse arrow. Tap outside the settings popup's card now closes just the popup, leaving the panel open.

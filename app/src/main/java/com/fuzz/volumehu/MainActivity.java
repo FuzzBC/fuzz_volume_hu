@@ -72,6 +72,10 @@ public class MainActivity extends AppCompatActivity {
             android.util.Log.w("MainActivity", "showing last crash failed", e);
         }
 
+        TextView versionText = findViewById(R.id.versionText);
+        versionText.setText("v" + BuildConfig.VERSION_MAJOR + "."
+                + String.format(java.util.Locale.US, "%03d", BuildConfig.VERSION_CODE));
+
         statusText = findViewById(R.id.statusText);
         grantOverlayBtn = findViewById(R.id.grantOverlayBtn);
         toggleServiceBtn = findViewById(R.id.toggleServiceBtn);
