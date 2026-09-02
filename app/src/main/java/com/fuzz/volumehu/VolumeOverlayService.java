@@ -277,16 +277,26 @@ public class VolumeOverlayService extends Service {
 
     @Override
     public void onDestroy() {
+        // Fully defensive, same reasoning as onCreate()'s own try/catch:
+        // this runs both for the deliberate "Stop volume overlay" path AND
+        // as the tail end of onCreate()'s own catch-and-stopSelf() on a
+        // startup failure - which can happen before `prefs` (or even `wm`)
+        // was ever assigned. Every field here used to be dereferenced
+        // unguarded; a sufficiently early onCreate() failure would have
+        // NPE'd right here, in a method the Service framework itself
+        // doesn't wrap in any try/catch - an uncaught exception in
+        // onDestroy() takes the whole process down same as anywhere else.
         super.onDestroy();
-        prefs.setOverlayStarted(false);
-        if (volumeReceiver != null) { try { unregisterReceiver(volumeReceiver); } catch (Exception ignored) {} }
-        if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
+        try { persistSizeAndConfPrefsNow(); } catch (Exception ignored) {} // flush any pending Size/Conf slider edits before this instance is gone
+        try { if (prefs != null) prefs.setOverlayStarted(false); } catch (Exception ignored) {}
+        try { if (volumeReceiver != null) unregisterReceiver(volumeReceiver); } catch (Exception ignored) {}
+        try { if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null); } catch (Exception ignored) {}
         try { removeTabWindow(); } catch (Exception ignored) {}
-        try { if (panelAdded) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
-        try { if (panelBackdropAdded) { wm.removeView(panelBackdropRoot); panelBackdropAdded = false; } } catch (Exception ignored) {}
-        try { if (themePopupAdded) { wm.removeView(themePopupRoot); themePopupAdded = false; } } catch (Exception ignored) {}
-        try { if (themeBackdropAdded) { wm.removeView(themeBackdropRoot); themeBackdropAdded = false; } } catch (Exception ignored) {}
-        stopForeground(true);
+        try { if (panelAdded && wm != null) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
+        try { if (panelBackdropAdded && wm != null) { wm.removeView(panelBackdropRoot); panelBackdropAdded = false; } } catch (Exception ignored) {}
+        try { if (themePopupAdded && wm != null) { wm.removeView(themePopupRoot); themePopupAdded = false; } } catch (Exception ignored) {}
+        try { if (themeBackdropAdded && wm != null) { wm.removeView(themeBackdropRoot); themeBackdropAdded = false; } } catch (Exception ignored) {}
+        try { stopForeground(true); } catch (Exception ignored) {}
     }
 
     // ---------------------------------------------------------- Notification
@@ -665,19 +675,16 @@ public class VolumeOverlayService extends Service {
 
         onSeek(bubbleSizeSeek, v -> {
             bubbleWidthDp = BUBBLE_WIDTH_MIN_DP + v;
-            prefs.setBubbleWidthDp(bubbleWidthDp);
             bubbleSizeLabel.setText("Bubble size: " + bubbleWidthDp + "dp");
             applyBubbleSizeLive();
         });
         onSeek(panelWidthSeek, v -> {
             panelWidthDp = PANEL_WIDTH_MIN_DP + v;
-            prefs.setPanelWidthDp(panelWidthDp);
             panelWidthLabel.setText("Volume panel width: " + panelWidthDp + "dp");
             if (panelAdded) positionPanel();
         });
         onSeek(panelHeightSeek, v -> {
             panelBarHeightDp = Math.min(PANEL_BAR_HEIGHT_MIN_DP + v, maxPanelBarHeightDp());
-            prefs.setPanelBarHeightDp(panelBarHeightDp);
             panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
             applyBarHeightLive();
             if (panelAdded) positionPanel();
@@ -717,22 +724,15 @@ public class VolumeOverlayService extends Service {
         // the user's finger is still on it makes the touch jump/stutter.
         onSeek(confMaxSeek, v -> {
             maxVolumeSupported = MAX_SUPPORTED_MIN + v;
-            prefs.setMaxVolumeSupported(maxVolumeSupported);
             confMaxLabel.setText("Max volume supported: " + maxVolumeSupported);
 
             confLimitSeek.setMax(Math.max(1, maxVolumeSupported - 1));
-            if (widgetMax > maxVolumeSupported) {
-                widgetMax = maxVolumeSupported;
-                prefs.setWidgetMax(widgetMax);
-            }
+            if (widgetMax > maxVolumeSupported) widgetMax = maxVolumeSupported;
             confLimitSeek.setProgress(widgetMax - 1);
             confLimitLabel.setText("Limited to: " + widgetMax);
 
             confSlowSeek.setMax(widgetMax);
-            if (dragCap > widgetMax) {
-                dragCap = widgetMax;
-                prefs.setDragCap(dragCap);
-            }
+            if (dragCap > widgetMax) dragCap = widgetMax;
             confSlowSeek.setProgress(dragCap);
             confSlowLabel.setText("When go slowly: " + dragCap);
 
@@ -740,14 +740,10 @@ public class VolumeOverlayService extends Service {
         });
         onSeek(confLimitSeek, v -> {
             widgetMax = clampInt(v + 1, 1, maxVolumeSupported);
-            prefs.setWidgetMax(widgetMax);
             confLimitLabel.setText("Limited to: " + widgetMax);
 
             confSlowSeek.setMax(widgetMax);
-            if (dragCap > widgetMax) {
-                dragCap = widgetMax;
-                prefs.setDragCap(dragCap);
-            }
+            if (dragCap > widgetMax) dragCap = widgetMax;
             confSlowSeek.setProgress(dragCap);
             confSlowLabel.setText("When go slowly: " + dragCap);
 
@@ -755,7 +751,6 @@ public class VolumeOverlayService extends Service {
         });
         onSeek(confSlowSeek, v -> {
             dragCap = clampInt(v, 0, widgetMax);
-            prefs.setDragCap(dragCap);
             confSlowLabel.setText("When go slowly: " + dragCap);
             applyConfLive();
         });
@@ -785,15 +780,42 @@ public class VolumeOverlayService extends Service {
 
     /** Small SeekBar.OnSeekBarChangeListener helper - only user-driven
      *  changes matter here (programmatic setProgress() calls, e.g. from
-     *  syncSizeTabUI()/syncConfTabUI(), must not re-trigger side effects). */
+     *  syncSizeTabUI()/syncConfTabUI(), must not re-trigger side effects).
+     *  onChange only updates in-memory fields and live visuals on every
+     *  tick, deliberately NOT Prefs - see persistSizeAndConfPrefsNow(),
+     *  called once here on release (onStopTrackingTouch) instead. Writing
+     *  to Prefs on every tick during a drag would mean dozens of disk
+     *  writes per second; deferring to release keeps dragging smooth
+     *  while still guaranteeing the final value is committed to disk
+     *  (synchronously - see Prefs.java) before the user can move on. */
     private void onSeek(SeekBar sb, IntConsumer onChange) {
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) onChange.accept(progress);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { persistSizeAndConfPrefsNow(); }
         });
+    }
+
+    /** Writes every Size/Conf tab value currently in memory to Prefs with a
+     *  synchronous commit() (not the usual async apply()) - called once a
+     *  slider drag actually ends (onSeek's onStopTrackingTouch) and again
+     *  as a safety net whenever the settings popup closes, so a value is
+     *  never left only in memory if this device's OEM battery/security
+     *  manager kills the process right after (a real, previously reported
+     *  risk on this app's target head units - see CHANGELOG history). */
+    private void persistSizeAndConfPrefsNow() {
+        try {
+            prefs.setBubbleWidthDp(bubbleWidthDp);
+            prefs.setPanelWidthDp(panelWidthDp);
+            prefs.setPanelBarHeightDp(panelBarHeightDp);
+            prefs.setMaxVolumeSupported(maxVolumeSupported);
+            prefs.setWidgetMax(widgetMax);
+            prefs.setDragCap(dragCap);
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "persistSizeAndConfPrefsNow failed", e);
+        }
     }
 
     // ---------------------------------------------------------- Settings popup drag
@@ -953,6 +975,11 @@ public class VolumeOverlayService extends Service {
     }
 
     private void hideThemePopup() {
+        // Safety net alongside onSeek()'s onStopTrackingTouch: if the popup
+        // is closed (Done/X/tap-outside) mid-drag, the SeekBar losing its
+        // window isn't guaranteed to deliver a clean release event first -
+        // make sure nothing adjusted this session is left only in memory.
+        persistSizeAndConfPrefsNow();
         try {
             if (themePopupAdded) {
                 wm.removeView(themePopupRoot);

@@ -14,6 +14,16 @@ import android.content.SharedPreferences;
  *              volume itself is never stored here; it's always read live
  *              from AudioManager (see VolumeOverlayService), so it can't
  *              drift from the real system value.
+ *
+ *              Every setter here uses commit() (synchronous, writes to
+ *              disk before returning), not the usual apply() (async,
+ *              fire-and-forget) - this app's target head units are known
+ *              to kill the process aggressively (see CHANGELOG history),
+ *              and an in-flight apply() isn't guaranteed to survive that.
+ *              Safe because every setter here is already called at most
+ *              once per discrete user action (a drag's release, a tap),
+ *              never on every intermediate tick of a drag - see
+ *              VolumeOverlayService.onSeek()/persistSizeAndConfPrefsNow().
  * Author:      FuzzBC
  * Date:        2026-09-01
  */
@@ -57,42 +67,42 @@ public class Prefs {
     }
 
     public String getSide() { return sp.getString(KEY_SIDE, "right"); }
-    public void setSide(String side) { sp.edit().putString(KEY_SIDE, side).apply(); }
+    public void setSide(String side) { sp.edit().putString(KEY_SIDE, side).commit(); }
 
     public float getVpos() { return sp.getFloat(KEY_VPOS, 50f); }
-    public void setVpos(float vpos) { sp.edit().putFloat(KEY_VPOS, vpos).apply(); }
+    public void setVpos(float vpos) { sp.edit().putFloat(KEY_VPOS, vpos).commit(); }
 
     public int getTheme() { return sp.getInt(KEY_THEME, 0); }
-    public void setTheme(int theme) { sp.edit().putInt(KEY_THEME, theme).apply(); }
+    public void setTheme(int theme) { sp.edit().putInt(KEY_THEME, theme).commit(); }
 
     public boolean wasOverlayStarted() { return sp.getBoolean(KEY_OVERLAY_STARTED, false); }
-    public void setOverlayStarted(boolean started) { sp.edit().putBoolean(KEY_OVERLAY_STARTED, started).apply(); }
+    public void setOverlayStarted(boolean started) { sp.edit().putBoolean(KEY_OVERLAY_STARTED, started).commit(); }
 
     public boolean isStorageSetupDone() { return sp.getBoolean(KEY_STORAGE_SETUP_DONE, false); }
-    public void setStorageSetupDone(boolean done) { sp.edit().putBoolean(KEY_STORAGE_SETUP_DONE, done).apply(); }
+    public void setStorageSetupDone(boolean done) { sp.edit().putBoolean(KEY_STORAGE_SETUP_DONE, done).commit(); }
 
     public boolean isDynamicColor() { return sp.getBoolean(KEY_DYNAMIC_COLOR, true); }
-    public void setDynamicColor(boolean dynamic) { sp.edit().putBoolean(KEY_DYNAMIC_COLOR, dynamic).apply(); }
+    public void setDynamicColor(boolean dynamic) { sp.edit().putBoolean(KEY_DYNAMIC_COLOR, dynamic).commit(); }
 
     public int getBubbleWidthDp() { return sp.getInt(KEY_BUBBLE_WIDTH, DEFAULT_BUBBLE_WIDTH_DP); }
-    public void setBubbleWidthDp(int dp) { sp.edit().putInt(KEY_BUBBLE_WIDTH, dp).apply(); }
+    public void setBubbleWidthDp(int dp) { sp.edit().putInt(KEY_BUBBLE_WIDTH, dp).commit(); }
 
     public int getPanelWidthDp() { return sp.getInt(KEY_PANEL_WIDTH, DEFAULT_PANEL_WIDTH_DP); }
-    public void setPanelWidthDp(int dp) { sp.edit().putInt(KEY_PANEL_WIDTH, dp).apply(); }
+    public void setPanelWidthDp(int dp) { sp.edit().putInt(KEY_PANEL_WIDTH, dp).commit(); }
 
     public int getPanelBarHeightDp() { return sp.getInt(KEY_PANEL_BAR_HEIGHT, DEFAULT_PANEL_BAR_HEIGHT_DP); }
-    public void setPanelBarHeightDp(int dp) { sp.edit().putInt(KEY_PANEL_BAR_HEIGHT, dp).apply(); }
+    public void setPanelBarHeightDp(int dp) { sp.edit().putInt(KEY_PANEL_BAR_HEIGHT, dp).commit(); }
 
     public int getMaxVolumeSupported() { return sp.getInt(KEY_MAX_VOLUME_SUPPORTED, DEFAULT_MAX_VOLUME_SUPPORTED); }
-    public void setMaxVolumeSupported(int v) { sp.edit().putInt(KEY_MAX_VOLUME_SUPPORTED, v).apply(); }
+    public void setMaxVolumeSupported(int v) { sp.edit().putInt(KEY_MAX_VOLUME_SUPPORTED, v).commit(); }
 
     public int getWidgetMax() { return sp.getInt(KEY_WIDGET_MAX, DEFAULT_WIDGET_MAX); }
-    public void setWidgetMax(int v) { sp.edit().putInt(KEY_WIDGET_MAX, v).apply(); }
+    public void setWidgetMax(int v) { sp.edit().putInt(KEY_WIDGET_MAX, v).commit(); }
 
     public int getDragCap() { return sp.getInt(KEY_DRAG_CAP, DEFAULT_DRAG_CAP); }
-    public void setDragCap(int v) { sp.edit().putInt(KEY_DRAG_CAP, v).apply(); }
+    public void setDragCap(int v) { sp.edit().putInt(KEY_DRAG_CAP, v).commit(); }
 
     public int getPopupX() { return sp.getInt(KEY_POPUP_X, -1); }
     public int getPopupY() { return sp.getInt(KEY_POPUP_Y, -1); }
-    public void setPopupPos(int x, int y) { sp.edit().putInt(KEY_POPUP_X, x).putInt(KEY_POPUP_Y, y).apply(); }
+    public void setPopupPos(int x, int y) { sp.edit().putInt(KEY_POPUP_X, x).putInt(KEY_POPUP_Y, y).commit(); }
 }

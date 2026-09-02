@@ -2,6 +2,8 @@
 
 ## 1.023
 - "Volume panel height" (Size tab) is now capped at 80% of the actual screen height instead of a fixed 260dp, so it can never grow taller than the screen can sensibly show - the cap is computed live per device.
+- Size/Conf tab sliders now write to disk with a synchronous commit() instead of the async apply() - only once per drag release (not on every intermediate tick, so dragging stays smooth), and again as a safety net whenever the settings popup closes. This device's OEM battery/security manager is known to kill this app's process aggressively; an in-flight apply() isn't guaranteed to survive that, commit() is.
+- Fixed a latent crash risk in onDestroy() (runs on "Stop volume overlay" and as the tail of a failed startup): several fields, prefs included, were dereferenced unguarded - a sufficiently early startup failure would have thrown right there, in a method Android itself doesn't wrap in any try/catch. Fully defensive now.
 
 ## 1.022
 - Fixed: dragging the bubble across the screen's midpoint moved it to the new side but left its half-circle shape (and icon alignment) stuck on the old side until something unrelated triggered a refresh - positionTab() (called live while dragging) only moves/resizes the window, the shape itself comes from updateTabAppearance() inside refreshVisuals(), which the drag never called. Now refreshed live the moment the drag crosses sides.
