@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.033
+- "Block system volume popup": held-button repeat rate raised from every 130ms to every 40ms (~25 steps/second) - the 400ms delay before repeat starts (so a plain tap still only ever registers as one step) is unchanged.
+
 ## 1.032
 - Fixed: the open-morph animation (1.031) always grew toward the "Themed" panel shape, ignoring whatever Panel background shape was actually selected on the Form tab (Rounded/Square/Pill/Clear) - it would morph toward the wrong shape for the whole animation, then visibly snap to the real one the instant it ended. On Clear it also briefly drew a background that shouldn't exist at all before it vanished. The animation now targets whichever shape is actually selected, and draws no background throughout on Clear, same as the settled state.
 

@@ -57,7 +57,7 @@ import android.view.accessibility.AccessibilityEvent;
 public class VolumeKeyAccessibilityService extends AccessibilityService {
 
     private static final long INITIAL_REPEAT_DELAY_MS = 400;
-    private static final long REPEAT_INTERVAL_MS = 130;
+    private static final long REPEAT_INTERVAL_MS = 40;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** 0 = no key currently held; otherwise AudioManager.ADJUST_RAISE/LOWER for whichever is. */
