@@ -3,7 +3,7 @@
      the EQ-segments bar+ball, the nudge arrow, and the collapse button.
      Root is a FrameLayout so the theme popup can sit on top of the card
      inside this same overlay window instead of needing a third window. -->
-<FrameLayout xmlns:android="http://schemas.android.com/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="184dp"
     android:layout_height="wrap_content">
 

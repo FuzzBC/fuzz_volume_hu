@@ -4,7 +4,7 @@
      rounded side bulging inward) and fill color are set in code by
      TabController, since both depend on which edge it's docked to and the
      live volume. -->
-<FrameLayout xmlns:android="http://schemas.android.com/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tabRoot"
     android:layout_width="52dp"
     android:layout_height="108dp"
