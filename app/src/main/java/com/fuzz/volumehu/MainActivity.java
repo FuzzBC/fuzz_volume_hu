@@ -8,6 +8,8 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
     private Button toggleServiceBtn;
     private Button batteryOptBtn;
     private Prefs prefs;
+    private UpdateInstaller updateInstaller; // lazily-created APK download/install helper
     // Set when this launch is showing a just-happened crash - onResume then
     // skips its usual auto-start-the-overlay so a crash always lands on the
     // plain main screen with the error, never straight back into whatever
@@ -318,11 +321,7 @@ public class MainActivity extends AppCompatActivity {
                         .setTitle("Update available: " + displayVersion)
                         .setMessage(releaseNotes == null || releaseNotes.trim().isEmpty()
                                 ? "A newer version is available on GitHub." : releaseNotes)
-                        .setPositiveButton("Download", (d, w) -> {
-                            if (!safeStartActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))) {
-                                Toast.makeText(MainActivity.this, "Couldn't open a browser - grab " + tagName + " from GitHub manually.", Toast.LENGTH_LONG).show();
-                            }
-                        })
+                        .setPositiveButton("Update", (d, w) -> startUpdateDownload(apkUrl, displayVersion, tagName))
                         .setNegativeButton("Later", null)
                         .show();
             }
@@ -337,5 +336,80 @@ public class MainActivity extends AppCompatActivity {
                 if (showUpToDateToast) Toast.makeText(MainActivity.this, "Update check failed: " + message, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /**
+     * Kicks off the APK download behind a live progress dialog (percent,
+     * size, speed, Cancel) and hands the finished file straight to the
+     * system installer - same UpdateInstaller/DownloadManager pattern as
+     * the other FuZz apps (FuZz LED, LEDCAR), replacing the old "open a
+     * browser to the raw APK URL" flow. On API 26+, installing from a
+     * downloaded file requires the user to have granted "install unknown
+     * apps" for this app first - if not granted, sends them straight to
+     * that settings screen instead of downloading (they can just tap
+     * Update again after).
+     */
+    private void startUpdateDownload(String apkUrl, String displayVersion, String tagName) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(this, "Allow \"install unknown apps\" for FuZz Volume HU, then tap Update again", Toast.LENGTH_LONG).show();
+            safeStartActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            return;
+        }
+
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(pad, pad, pad, pad);
+        ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(100);
+        bar.setIndeterminate(true);
+        root.addView(bar);
+        TextView status = new TextView(this);
+        status.setText("Starting download...");
+        status.setPadding(0, pad / 2, 0, 0);
+        root.addView(status);
+
+        if (updateInstaller == null) updateInstaller = new UpdateInstaller(this);
+        AlertDialog progressDialog = new AlertDialog.Builder(this)
+                .setTitle("Downloading " + displayVersion)
+                .setView(root)
+                .setCancelable(false)
+                .setNegativeButton("Cancel", (d, w) -> {
+                    updateInstaller.cancel();
+                    Toast.makeText(this, "Update cancelled", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+
+        updateInstaller.download(apkUrl, tagName, new UpdateInstaller.ProgressListener() {
+            @Override
+            public void onProgress(int percent, long downloaded, long total, double speedBps) {
+                if (percent < 0) {
+                    bar.setIndeterminate(true);
+                    status.setText(humanBytes(downloaded) + " downloaded...");
+                } else {
+                    bar.setIndeterminate(false);
+                    bar.setProgress(percent);
+                    status.setText(percent + "%  -  " + humanBytes(downloaded) + " / " + humanBytes(total)
+                            + "  (" + humanBytes((long) speedBps) + "/s)");
+                }
+            }
+
+            @Override
+            public void onComplete() {
+                progressDialog.dismiss();
+            }
+
+            @Override
+            public void onFailed(String reason) {
+                progressDialog.dismiss();
+                Toast.makeText(MainActivity.this, "Update download failed: " + reason, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private String humanBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0);
+        return String.format(java.util.Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
     }
 }

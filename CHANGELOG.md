@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.021
+- Tap outside the panel (anywhere else on screen) now collapses it back to the bubble - same as the collapse arrow. Tap outside the settings popup's card now closes just the popup, leaving the panel open.
+- Updating the app now downloads the APK in the background with a live progress dialog (percent, size, speed, Cancel) and hands it straight to the system installer when done - same DownloadManager-based flow as FuZz LED / LEDCAR, replacing the old "open a browser to the raw APK URL" step.
+- Grew the theme picker from 24 to 60 colors.
+- Collapse (retract) arrow button is now a true circle instead of an oblong pill.
+- Fixed: the "/25" next to the volume number in the panel never actually reflected the Conf tab's "max volume supported" - it was hardcoded in the layout and never looked up in code at all. It now shows "/" + whatever that's set to, live.
+- "Volume panel width" (Size tab) can now go down to 80dp (was 110).
+
 ## 1.020
 - Removed the "hold 2s for custom" hint text under the volume readout entirely - the hold-to-open gesture is still exactly 2s, just silent now; the thin progress line is still the only feedback while holding.
 - The Size tab's first slider now resizes the floating bubble itself (was: the settings popup's own size, which is fixed at 260dp now) - its height and icon scale together with it.

@@ -75,7 +75,7 @@ public class VolumeOverlayService extends Service {
 
     // Size tab slider ranges (dp) - min value + seekbar's 0-based progress.
     private static final int BUBBLE_WIDTH_MIN_DP = 36, BUBBLE_WIDTH_MAX_DP = 90;
-    private static final int PANEL_WIDTH_MIN_DP = 110, PANEL_WIDTH_MAX_DP = 260;
+    private static final int PANEL_WIDTH_MIN_DP = 80, PANEL_WIDTH_MAX_DP = 260; // 80 = just enough for the 40dp EQ bar + panelCard's 14dp padding on each side
     private static final int PANEL_BAR_HEIGHT_MIN_DP = 90, PANEL_BAR_HEIGHT_MAX_DP = 260;
     // The floating bubble's original proportions (52x108dp) and icon size
     // (see overlay_tab.xml history) as ratios, so resizing the bubble via
@@ -126,7 +126,18 @@ public class VolumeOverlayService extends Service {
     private WindowManager.LayoutParams panelParams;
     private boolean panelAdded = false;
 
+    // Invisible full-screen tap-catcher, added behind the panel while it's
+    // open so a tap anywhere outside it (unlike the theme popup's backdrop,
+    // never dimmed - the panel sits over whatever app the user was already
+    // in) collapses the panel back to the bubble, same as the collapse
+    // arrow. The panel window itself sits on top and keeps handling its
+    // own touches as always.
+    private View panelBackdropRoot;
+    private WindowManager.LayoutParams panelBackdropParams;
+    private boolean panelBackdropAdded = false;
+
     private TextView volNum;
+    private TextView volMax;
     private View holdProgressFill;
     private ImageButton nudgeBtn;
     private ImageButton collapseBtn;
@@ -267,6 +278,7 @@ public class VolumeOverlayService extends Service {
         if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
         try { removeTabWindow(); } catch (Exception ignored) {}
         try { if (panelAdded) { wm.removeView(panelRoot); panelAdded = false; } } catch (Exception ignored) {}
+        try { if (panelBackdropAdded) { wm.removeView(panelBackdropRoot); panelBackdropAdded = false; } } catch (Exception ignored) {}
         try { if (themePopupAdded) { wm.removeView(themePopupRoot); themePopupAdded = false; } } catch (Exception ignored) {}
         try { if (themeBackdropAdded) { wm.removeView(themeBackdropRoot); themeBackdropAdded = false; } } catch (Exception ignored) {}
         stopForeground(true);
@@ -446,6 +458,7 @@ public class VolumeOverlayService extends Service {
     private void openPanel() {
         removeTabWindow();
         try {
+            addPanelBackdrop(); // added first so panelRoot (added next) draws on top and keeps its own touches
             if (panelRoot == null) inflatePanel();
             panelParams = newOverlayParams(dp(panelWidthDp), WindowManager.LayoutParams.WRAP_CONTENT);
             positionPanel();
@@ -454,6 +467,7 @@ public class VolumeOverlayService extends Service {
             refreshVisuals();
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "openPanel failed", e);
+            removePanelBackdrop();
             addTabWindow(); // fall back to just the tab rather than leaving nothing on screen
         }
     }
@@ -466,7 +480,28 @@ public class VolumeOverlayService extends Service {
                 panelAdded = false;
             }
         } catch (Exception ignored) {}
+        removePanelBackdrop();
         addTabWindow();
+    }
+
+    /** Invisible full-screen window behind the panel - a tap anywhere on it
+     *  (i.e. outside the panel itself) collapses the panel. */
+    private void addPanelBackdrop() {
+        if (panelBackdropAdded) return;
+        if (panelBackdropRoot == null) {
+            panelBackdropRoot = new View(themedCtx);
+            panelBackdropRoot.setOnClickListener(v -> closePanel());
+        }
+        panelBackdropParams = newOverlayParams(
+                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        wm.addView(panelBackdropRoot, panelBackdropParams);
+        panelBackdropAdded = true;
+    }
+
+    private void removePanelBackdrop() {
+        if (!panelBackdropAdded) return;
+        try { wm.removeView(panelBackdropRoot); } catch (Exception ignored) {}
+        panelBackdropAdded = false;
     }
 
     private void positionPanel() {
@@ -491,6 +526,7 @@ public class VolumeOverlayService extends Service {
         panelRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_panel, null);
         readoutRow = panelRoot.findViewById(R.id.readoutRow);
         volNum = panelRoot.findViewById(R.id.volNum);
+        volMax = panelRoot.findViewById(R.id.volMax);
         holdProgressFill = panelRoot.findViewById(R.id.holdProgressFill);
         holdProgressFill.setPivotX(0f);
         nudgeBtn = panelRoot.findViewById(R.id.nudgeBtn);
@@ -843,6 +879,7 @@ public class VolumeOverlayService extends Service {
             if (themePopupAdded) return;
             if (themeBackdropRoot == null) {
                 themeBackdropRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_theme_backdrop, null);
+                themeBackdropRoot.setOnClickListener(v -> hideThemePopup()); // tap outside the card closes the popup
             }
             if (!themeBackdropAdded) {
                 themeBackdropParams = newOverlayParams(
@@ -957,6 +994,7 @@ public class VolumeOverlayService extends Service {
 
             if (panelAdded && volNum != null) {
                 volNum.setText(String.valueOf(raw));
+                if (volMax != null) volMax.setText("/" + maxVolumeSupported);
                 eqBar.setBarValue(barVal);
                 eqBar.setBallColor(color);
                 boolean showNudge = raw >= dragCap && raw < widgetMax;

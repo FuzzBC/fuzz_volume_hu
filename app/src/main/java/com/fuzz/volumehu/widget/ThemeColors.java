@@ -4,7 +4,7 @@ import android.graphics.Color;
 
 /**
  * File:        ThemeColors.java
- * Description: The 24 selectable volume-color themes plus the same
+ * Description: The 60 selectable volume-color themes plus the same
  *              low->mid->high interpolation used by the HTML prototype:
  *              0-12.5 blends low into mid, 12.5-25 blends mid into high.
  *              Theme 0 ("Original") is the neumorphic skin's own default
@@ -51,6 +51,44 @@ public final class ThemeColors {
             new Theme("Turquoise",     "#99F6E4", "#14B8A6", "#115E59"),
             new Theme("Mono Ash",      "#E5E7EB", "#9CA3AF", "#374151"),
             new Theme("FuZz Signature","#F3F4F6", "#F87171", "#DC2626"),
+
+            // 36 more, bringing the picker to 60 total.
+            new Theme("Indigo Sky",    "#C7D2FE", "#6366F1", "#312E81"),
+            new Theme("Sapphire",      "#93C5FD", "#2563EB", "#1E3A8A"),
+            new Theme("Denim",         "#BFDBFE", "#3B82F6", "#1E40AF"),
+            new Theme("Cobalt",        "#7DD3FC", "#0284C7", "#0C4A6E"),
+            new Theme("Aqua Breeze",   "#A5F3FC", "#06B6D4", "#164E63"),
+            new Theme("Teal Deep",     "#5EEAD4", "#0D9488", "#134E4A"),
+            new Theme("Jade",          "#99F6E4", "#059669", "#064E3B"),
+            new Theme("Pine",          "#86EFAC", "#16A34A", "#052E16"),
+            new Theme("Moss",          "#BEF264", "#4D7C0F", "#1A2E05"),
+            new Theme("Olive Grove",   "#D9F99D", "#65A30D", "#365314"),
+            new Theme("Mustard Gold",  "#FEF3C7", "#D97706", "#78350F"),
+            new Theme("Marigold",      "#FDE68A", "#EA580C", "#7C2D12"),
+            new Theme("Rust",          "#FDBA74", "#C2410C", "#431407"),
+            new Theme("Copper",        "#FED7AA", "#B45309", "#78350F"),
+            new Theme("Wine",          "#FCA5A5", "#B91C1C", "#450A0A"),
+            new Theme("Rosewood",      "#FECDD3", "#E11D48", "#881337"),
+            new Theme("Magenta Pop",   "#FBCFE8", "#DB2777", "#500724"),
+            new Theme("Fuchsia Bloom", "#F5D0FE", "#D946EF", "#86198F"),
+            new Theme("Plum",          "#F3E8FF", "#C026D3", "#581C87"),
+            new Theme("Amethyst",      "#E9D5FF", "#9333EA", "#4C1D95"),
+            new Theme("Violet Dream",  "#DDD6FE", "#7C3AED", "#4C1D95"),
+            new Theme("Lavender",      "#E0E7FF", "#818CF8", "#3730A3"),
+            new Theme("Periwinkle",    "#C7D2FE", "#4F46E5", "#312E81"),
+            new Theme("Sky Blue",      "#7DD3FC", "#0EA5E9", "#075985"),
+            new Theme("Ice",           "#E0F2FE", "#38BDF8", "#0C4A6E"),
+            new Theme("Frost",         "#F0F9FF", "#7DD3FC", "#075985"),
+            new Theme("Charcoal",      "#D1D5DB", "#4B5563", "#111827"),
+            new Theme("Slate",         "#CBD5E1", "#475569", "#0F172A"),
+            new Theme("Ash Grey",      "#E5E7EB", "#6B7280", "#1F2937"),
+            new Theme("Sandstone",     "#FDE68A", "#CA8A04", "#713F12"),
+            new Theme("Desert Sun",    "#FCD34D", "#D97706", "#854D0E"),
+            new Theme("Terracotta",    "#FDBA74", "#C2410C", "#7C2D12"),
+            new Theme("Blush Pink",    "#FBCFE8", "#F472B6", "#9D174D"),
+            new Theme("Coral Reef",    "#FED7AA", "#FB7185", "#9F1239"),
+            new Theme("Midnight Blue", "#93C5FD", "#1D4ED8", "#172554"),
+            new Theme("Storm Grey",    "#CBD5E1", "#64748B", "#1E293B"),
     };
 
     private ThemeColors() {}

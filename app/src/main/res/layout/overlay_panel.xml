@@ -90,12 +90,14 @@
             android:layout_width="40dp"
             android:layout_height="150dp" />
 
-        <!-- Collapse arrow: rotated in code to point at whichever edge
-             the panel is docked to. -->
+        <!-- Collapse (retract) arrow: rotated in code to point at whichever
+             edge the panel is docked to. Square, so the fully-rounded
+             bg_small_button (see tintSmallButton()) renders as a true
+             circle instead of an oblong pill. -->
         <ImageButton
             android:id="@+id/collapseBtn"
-            android:layout_width="42dp"
-            android:layout_height="26dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_small_button"
             android:src="@drawable/ic_chevron"
