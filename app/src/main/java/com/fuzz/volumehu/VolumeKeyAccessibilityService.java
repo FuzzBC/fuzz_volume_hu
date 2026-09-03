@@ -65,7 +65,7 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
     private final Runnable repeatRunnable = new Runnable() {
         @Override public void run() {
             if (heldDirection == 0) return;
-            applyStep(heldDirection);
+            applyStep(heldDirection, false);
             handler.postDelayed(this, REPEAT_INTERVAL_MS);
         }
     };
@@ -88,7 +88,26 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
             if (code != KeyEvent.KEYCODE_VOLUME_UP && code != KeyEvent.KEYCODE_VOLUME_DOWN) {
                 return super.onKeyEvent(event);
             }
-            if (!new Prefs(this).isBlockNativeVolumeUi()) {
+            String keyName = code == KeyEvent.KEYCODE_VOLUME_UP ? "VOLUME_UP" : "VOLUME_DOWN";
+            boolean blockOn = new Prefs(this).isBlockNativeVolumeUi();
+
+            // repeatCount==0 is the actual physical press-down, whether or
+            // not the OS also sends its own repeat DOWNs afterward (see
+            // class doc) - logging only this line, once per real press,
+            // is what tells us on a head unit with no adb whether this
+            // service is even receiving the key at all, and whether the
+            // block toggle read as on at that moment. If the head unit's
+            // own volume popup still shows up despite this line reading
+            // "blockEnabled=true" and the value below actually changing,
+            // that popup isn't tied to the standard key-event pipeline at
+            // all (some OEM launchers show their own volume HUD off the
+            // raw stream value changing, independent of FLAG_SHOW_UI or
+            // who changed it) - nothing at this level can suppress that.
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                TraceLog.step(this, "VolumeKey " + keyName + " pressed, blockEnabled=" + blockOn);
+            }
+
+            if (!blockOn) {
                 stopRepeating(); // turned off mid-press - don't leave a stray loop running
                 return super.onKeyEvent(event);
             }
@@ -99,7 +118,7 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (heldDirection != direction) {
                     heldDirection = direction;
-                    applyStep(direction); // instant feedback for a plain tap
+                    applyStep(direction, true); // instant feedback for a plain tap
                     handler.removeCallbacks(repeatRunnable);
                     handler.postDelayed(repeatRunnable, INITIAL_REPEAT_DELAY_MS);
                 }
@@ -112,16 +131,30 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
             return true; // consume - the system never processes this key at all
         } catch (Exception e) {
             android.util.Log.e("VolumeKeyAccessibilityService", "onKeyEvent failed", e);
+            TraceLog.error(this, "VolumeKeyAccessibilityService.onKeyEvent failed", e);
             return super.onKeyEvent(event);
         }
     }
 
-    private void applyStep(int direction) {
+    /** @param logResult True only for the first step of a press - every
+     *  40ms repeat tick calling this while held would flood the trace log
+     *  for no diagnostic benefit; the first step per press is what actually
+     *  proves adjustStreamVolume() is taking effect on this device. */
+    private void applyStep(int direction, boolean logResult) {
         try {
             AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            if (am != null) am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0);
+            if (am == null) {
+                if (logResult) TraceLog.error(this, "applyStep: AudioManager unavailable", new IllegalStateException("no AudioManager"));
+                return;
+            }
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0);
+            if (logResult) {
+                int now = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+                TraceLog.step(this, "applyStep: adjustStreamVolume applied, STREAM_MUSIC now=" + now);
+            }
         } catch (Exception e) {
             android.util.Log.e("VolumeKeyAccessibilityService", "applyStep failed", e);
+            TraceLog.error(this, "applyStep failed", e);
         }
     }
 
