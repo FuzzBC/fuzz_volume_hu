@@ -51,6 +51,25 @@ import android.view.accessibility.AccessibilityEvent;
  *              untouched) whenever that's off, so granting Accessibility
  *              access alone doesn't change anything until the main
  *              screen's toggle is also turned on.
+ *
+ *              Backstop for hardware where the native popup shows up
+ *              anyway: confirmed live (adb dumpsys window) that Android's
+ *              own volume dialog is a window of its own
+ *              (com.android.systemui, class VolumeDialogImpl on this test
+ *              device; VolumePanelDialogActivity on newer Android)
+ *              independent of who changed the stream or how - so a head
+ *              unit whose vendor volume HUD isn't wired through the
+ *              standard key pipeline at all (see onKeyEvent()'s doc) can
+ *              still be caught here, from the window side instead of the
+ *              key side. onAccessibilityEvent() watches every
+ *              TYPE_WINDOW_STATE_CHANGED event for a package/class match
+ *              against KNOWN_VOLUME_DIALOG_CLASSES and immediately backs
+ *              out of it (GLOBAL_ACTION_BACK) when blocking is on. Any
+ *              systemui window that shows up but doesn't match is logged
+ *              too (not dismissed) - on unfamiliar HU firmware that line
+ *              is what tells us the real class name to add to the list,
+ *              the same way the key-side logging did for held-button
+ *              repeats.
  * Author:      FuzzBC
  * Date:        2026-09-03
  */
@@ -58,6 +77,16 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
 
     private static final long INITIAL_REPEAT_DELAY_MS = 400;
     private static final long REPEAT_INTERVAL_MS = 40;
+
+    /** Known class names of the native/system volume dialog window across
+     *  Android versions and the one real device this was checked against
+     *  live. A head unit's vendor firmware may use a different one entirely -
+     *  see the unmatched-systemui logging in onAccessibilityEvent(). */
+    private static final String[] KNOWN_VOLUME_DIALOG_CLASSES = {
+            "com.android.systemui.volume.VolumeDialogImpl",
+            "com.android.systemui.volume.VolumePanelDialogActivity",
+            "com.android.systemui.volume.dialog.ui.VolumeDialogImpl",
+    };
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** 0 = no key currently held; otherwise AudioManager.ADJUST_RAISE/LOWER for whichever is. */
@@ -72,9 +101,37 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Unused - this service only cares about onKeyEvent(); the config
-        // XML's accessibilityEventTypes is set to the narrowest value the
-        // schema allows since no actual event stream is consumed here.
+        try {
+            if (event == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+            if (!new Prefs(this).isBlockNativeVolumeUi()) return;
+
+            CharSequence pkgSeq = event.getPackageName();
+            CharSequence clsSeq = event.getClassName();
+            String pkg = pkgSeq == null ? "" : pkgSeq.toString();
+            String cls = clsSeq == null ? "" : clsSeq.toString();
+            if (pkg.isEmpty() && cls.isEmpty()) return;
+
+            boolean known = isKnownVolumeDialogClass(cls);
+            // Log every systemui window even when it's not a recognized
+            // match, so an unfamiliar HU's real volume-HUD class name shows
+            // up in the trace log instead of just silently not matching.
+            if (known || pkg.contains("systemui")) {
+                TraceLog.step(this, "Window shown: pkg=" + pkg + " cls=" + cls + " knownVolumeDialog=" + known);
+            }
+            if (known) {
+                boolean dismissed = performGlobalAction(GLOBAL_ACTION_BACK);
+                TraceLog.step(this, "Native volume dialog window detected, dismiss requested, result=" + dismissed);
+            }
+        } catch (Exception e) {
+            TraceLog.error(this, "onAccessibilityEvent failed", e);
+        }
+    }
+
+    private static boolean isKnownVolumeDialogClass(String cls) {
+        for (String known : KNOWN_VOLUME_DIALOG_CLASSES) {
+            if (known.equals(cls)) return true;
+        }
+        return false;
     }
 
     @Override

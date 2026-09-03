@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.036
+- "Block system volume popup" gets a second layer for hardware where the native volume popup showed up anyway despite the block (the 1.034 head-unit report): confirmed live via `adb dumpsys window` that Android's own volume dialog is a window of its own (systemui, VolumeDialogImpl/VolumePanelDialogActivity depending on Android version), independent of whether the key press itself was ever caught - so on a head unit whose vendor volume HUD isn't wired through the standard key pipeline at all, catching the key was never going to be enough. VolumeKeyAccessibilityService now also watches for that window appearing and immediately backs out of it while blocking is on. Any unrecognized systemui window that shows up gets logged to the trace log too (not dismissed) - on unfamiliar head-unit firmware that line reveals the real class name to add, the same way key-press logging did for the held-button repeat fix.
+
 ## 1.035
 - Removed the panel auto-peek: a volume change no longer opens the panel on its own. "Block system volume popup" still intercepts the hardware keys and applies the change silently exactly as before - only the panel's own reaction changed, and it now only ever updates its display when it's already open (a manual tap), never opening or closing itself.
 
