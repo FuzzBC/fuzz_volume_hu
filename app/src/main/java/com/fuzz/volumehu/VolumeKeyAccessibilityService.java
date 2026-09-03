@@ -52,23 +52,31 @@ import android.view.accessibility.AccessibilityEvent;
  *              access alone doesn't change anything until the main
  *              screen's toggle is also turned on.
  *
- *              Tried and reverted: a window-watch backstop for hardware
- *              where the native popup shows up anyway, using
- *              TYPE_WINDOW_STATE_CHANGED + performGlobalAction(BACK) to
- *              back out of it the instant it appeared. Verified live (adb
- *              dumpsys window) that the popup is its own protected system
- *              window (com.android.systemui, class
- *              VolumeDialogImpl$CustomDialog on the Samsung S25 Ultra this
- *              was tested on) and that GLOBAL_ACTION_BACK does nothing to
- *              it - Android doesn't let an accessibility service dismiss
- *              system UI that way, by design. Worse, BACK doesn't just
- *              fail silently: it still gets delivered to whatever's
- *              actually focused, so every volume press was sending a
- *              spurious back-press into the foreground app (confirmed live
- *              - it backed the test device out to its launcher). Pulled
- *              entirely rather than ship a feature that does nothing to
- *              the popup while quietly navigating the driver's foreground
- *              app backward on every volume tap.
+ *              Tried and reverted (1.036/1.037): a window-watch backstop
+ *              that used TYPE_WINDOW_STATE_CHANGED + performGlobalAction
+ *              (BACK) to back out of the native popup the instant it
+ *              appeared. Verified live (adb dumpsys window) that the popup
+ *              is its own protected system window and that
+ *              GLOBAL_ACTION_BACK does nothing to it - Android doesn't let
+ *              an accessibility service dismiss system UI that way, by
+ *              design. Worse, BACK didn't fail silently: it was still
+ *              delivered to whatever actually had focus, so every volume
+ *              press sent a spurious back-press into the foreground app
+ *              (confirmed live - backed the test device out to its
+ *              launcher). The dismiss attempt was pulled entirely, but the
+ *              same event type is put to a purely observational use below.
+ *
+ *              "Which app is actually showing this?" (1.038): every window
+ *              that becomes active within WINDOW_WATCH_MS of a volume
+ *              press gets its package + class name written to the trace
+ *              log - not filtered by package name (a head unit's vendor
+ *              popup won't necessarily be "com.android.systemui" the way
+ *              Samsung's is, so guessing package names up front would just
+ *              miss it), filtered by timing instead: only what shows up
+ *              right after a real press is logged, so normal navigation
+ *              the rest of the time doesn't flood the log. No action is
+ *              taken on what's found - purely so the log can answer "which
+ *              app is that popup" on hardware with no adb access at all.
  * Author:      FuzzBC
  * Date:        2026-09-03
  */
@@ -76,8 +84,16 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
 
     private static final long INITIAL_REPEAT_DELAY_MS = 400;
     private static final long REPEAT_INTERVAL_MS = 40;
+    /** How long after a volume press a newly-shown window still counts as
+     *  "probably related to that press" for the trace-log identification
+     *  below - long enough to catch a slow HU launcher, short enough that
+     *  unrelated navigation a few seconds later doesn't get logged too. */
+    private static final long WINDOW_WATCH_MS = 3000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** System time of the last real volume key press (repeatCount==0),
+     *  0 if none yet this session - see onAccessibilityEvent(). */
+    private long lastKeyPressAtMs = 0;
     /** 0 = no key currently held; otherwise AudioManager.ADJUST_RAISE/LOWER for whichever is. */
     private int heldDirection = 0;
     private final Runnable repeatRunnable = new Runnable() {
@@ -90,11 +106,21 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Unused - see class doc for the window-watch approach that was
-        // tried here and reverted (ineffective against protected system UI,
-        // and had a real side effect of its own). This service only cares
-        // about onKeyEvent(); the config XML's accessibilityEventTypes is
-        // back to the narrowest value the schema allows.
+        try {
+            if (event == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+            if (lastKeyPressAtMs == 0) return;
+            long age = System.currentTimeMillis() - lastKeyPressAtMs;
+            if (age < 0 || age > WINDOW_WATCH_MS) return;
+
+            CharSequence pkgSeq = event.getPackageName();
+            CharSequence clsSeq = event.getClassName();
+            String pkg = pkgSeq == null ? "(none)" : pkgSeq.toString();
+            String cls = clsSeq == null ? "(none)" : clsSeq.toString();
+            if (pkg.equals(getPackageName())) return; // our own panel/bubble opening isn't the thing being hunted for
+            TraceLog.step(this, "Window shown " + age + "ms after volume press: pkg=" + pkg + " cls=" + cls);
+        } catch (Exception e) {
+            TraceLog.error(this, "onAccessibilityEvent failed", e);
+        }
     }
 
     @Override
@@ -125,6 +151,7 @@ public class VolumeKeyAccessibilityService extends AccessibilityService {
             // who changed it) - nothing at this level can suppress that.
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 TraceLog.step(this, "VolumeKey " + keyName + " pressed, blockEnabled=" + blockOn);
+                lastKeyPressAtMs = System.currentTimeMillis(); // arms the window-watch log in onAccessibilityEvent()
             }
 
             if (!blockOn) {

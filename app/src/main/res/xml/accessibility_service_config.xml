@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No accessibility events needed - VolumeKeyAccessibilityService only
-     implements onKeyEvent() to intercept the hardware volume keys.
-     canRequestFilterKeyEvents + flagRequestFilterKeyEvents are the two
-     pieces that actually matter here; canRetrieveWindowContent stays
-     false since this service never reads screen content. A
-     typeWindowStateChanged + GLOBAL_ACTION_BACK backstop was tried and
-     reverted - see VolumeKeyAccessibilityService's class doc. -->
+<!-- canRequestFilterKeyEvents + flagRequestFilterKeyEvents intercept the
+     hardware volume keys via onKeyEvent() - that's the actual "Block
+     system volume popup" mechanism. typeWindowStateChanged is for
+     identification only (see onAccessibilityEvent()'s doc): logging which
+     window shows up right after a volume press, not acting on it - an
+     earlier attempt to also dismiss that window via GLOBAL_ACTION_BACK was
+     reverted (see VolumeKeyAccessibilityService's class doc), this only
+     watches now. canRetrieveWindowContent stays false since only the
+     event's own package/class name is read, never screen content. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeNotificationStateChanged"
+    android:accessibilityEventTypes="typeNotificationStateChanged|typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRequestFilterKeyEvents"
     android:canRequestFilterKeyEvents="true"
