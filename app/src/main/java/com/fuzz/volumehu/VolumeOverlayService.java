@@ -209,14 +209,6 @@ public class VolumeOverlayService extends Service {
 
     private BroadcastReceiver volumeReceiver;
 
-    // "Block system volume popup" - see VolumeKeyAccessibilityService and
-    // maybePeekPanel(). True only while the panel is open BECAUSE of a
-    // volume change (not a real tap/drag), so it knows to auto-close
-    // itself - and so a genuine interaction can "claim" it as a real open.
-    private static final long PEEK_CLOSE_MS = 2000;
-    private boolean panelPeeking = false;
-    private final Runnable peekCloseRunnable = this::closePeek;
-
     @Nullable
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -364,10 +356,10 @@ public class VolumeOverlayService extends Service {
 
     private void registerVolumeReceiver() {
         volumeReceiver = new BroadcastReceiver() {
-            @Override public void onReceive(Context context, Intent intent) {
-                refreshVisuals();
-                maybePeekPanel();
-            }
+            // Only reacts if the panel is already open (refreshVisuals()
+            // itself no-ops the panel-only parts when !panelAdded) - a
+            // volume change never opens or closes anything on its own.
+            @Override public void onReceive(Context context, Intent intent) { refreshVisuals(); }
         };
         IntentFilter f = new IntentFilter("android.media.VOLUME_CHANGED_ACTION");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -571,9 +563,9 @@ public class VolumeOverlayService extends Service {
             // Shape-morph open: the bubble's own current geometry is the
             // animation's starting point - capture it before removeTabWindow()
             // takes it away. openPanel() is only ever reached with the tab
-            // actually showing (a tap on it, or maybePeekPanel()'s own
-            // tabAdded check), so tabParams reflects it; the fallback to the
-            // end geometry only matters if that ever stops being true.
+            // actually showing (a genuine tap on it), so tabParams reflects
+            // it; the fallback to the end geometry only matters if that
+            // ever stops being true.
             int startW = tabAdded && tabParams != null ? tabParams.width : endW;
             int startH = tabAdded && tabParams != null ? tabParams.height : endH;
             int startX = tabAdded && tabParams != null ? tabParams.x : endX;
@@ -685,12 +677,6 @@ public class VolumeOverlayService extends Service {
     }
 
     private void closePanel() {
-        // Whatever actually closed it (collapse arrow, tap-outside, a real
-        // long-press-to-close, or this itself) - the panel is no longer
-        // showing, so any pending peek auto-close is moot and the flag
-        // must not linger into the next open.
-        panelPeeking = false;
-        mainHandler.removeCallbacks(peekCloseRunnable);
         hideThemePopup();
         try {
             if (panelAdded) {
@@ -700,48 +686,6 @@ public class VolumeOverlayService extends Service {
         } catch (Exception ignored) {}
         removePanelBackdrop();
         addTabWindow();
-    }
-
-    /** "Block system volume popup": opens the panel for PEEK_CLOSE_MS
-     *  whenever the volume changes and the panel wasn't already showing,
-     *  closing itself back to the bubble after - the replacement for
-     *  Android's own (now-suppressed) volume popup. If the panel is
-     *  already peeking, a further volume change just pushes the
-     *  auto-close timer back out instead of reopening. Does nothing if the
-     *  panel is already open for a real reason (the user tapped it open,
-     *  or is mid-interaction - see cancelPeekIfActive()) - never yanks a
-     *  panel the user is actually looking at out from under them. */
-    private void maybePeekPanel() {
-        try {
-            if (!prefs.isBlockNativeVolumeUi()) return;
-            if (panelAdded) {
-                if (panelPeeking) {
-                    mainHandler.removeCallbacks(peekCloseRunnable);
-                    mainHandler.postDelayed(peekCloseRunnable, PEEK_CLOSE_MS);
-                }
-                return;
-            }
-            if (!tabAdded) return; // mid-transition (e.g. popup animating) - nothing sensible to peek from
-            panelPeeking = true;
-            openPanel();
-            mainHandler.postDelayed(peekCloseRunnable, PEEK_CLOSE_MS);
-        } catch (Exception e) {
-            android.util.Log.e("VolumeOverlayService", "maybePeekPanel failed", e);
-        }
-    }
-
-    private void closePeek() {
-        if (panelPeeking) closePanel();
-    }
-
-    /** A real interaction (drag, nudge, hold) "claims" a peeked-open panel
-     *  as a genuine open - cancels the pending auto-close so it doesn't
-     *  vanish out from under whatever the user is actually doing with it. */
-    private void cancelPeekIfActive() {
-        if (panelPeeking) {
-            panelPeeking = false;
-            mainHandler.removeCallbacks(peekCloseRunnable);
-        }
     }
 
     /** Invisible full-screen window behind the panel - a tap anywhere on it
@@ -801,7 +745,7 @@ public class VolumeOverlayService extends Service {
         collapseBtn.setOnClickListener(v -> closePanel());
         nudgeBtn.setOnClickListener(v -> onNudgeClick());
         eqBar.setListener(new EqBarView.Listener() {
-            @Override public void onDragValue(int value0toMax) { cancelPeekIfActive(); setRealVolume(value0toMax); }
+            @Override public void onDragValue(int value0toMax) { setRealVolume(value0toMax); }
             @Override public void onDragEnd() { /* already applied live */ }
         });
     }
@@ -1149,7 +1093,6 @@ public class VolumeOverlayService extends Service {
 
     private void onNudgeClick() {
         try {
-            cancelPeekIfActive();
             if (nudgeLocked) return;
             int raw = getRawVolume();
             if (raw >= widgetMax) return;
@@ -1182,7 +1125,6 @@ public class VolumeOverlayService extends Service {
     private boolean onThemeHoldTouchInner(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                cancelPeekIfActive();
                 themeDownX = event.getRawX();
                 themeDownY = event.getRawY();
                 themeMoved = false;

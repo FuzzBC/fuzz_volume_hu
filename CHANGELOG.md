@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.035
+- Removed the panel auto-peek: a volume change no longer opens the panel on its own. "Block system volume popup" still intercepts the hardware keys and applies the change silently exactly as before - only the panel's own reaction changed, and it now only ever updates its display when it's already open (a manual tap), never opening or closing itself.
+
 ## 1.034
 - Diagnostics for "head unit's own volume popup still shows even with Block on": VolumeKeyAccessibilityService now writes to the trace log once per actual physical volume press (key name + whether the block toggle read as on at that moment) and once per resulting AudioManager.adjustStreamVolume() call (the stream's new value, proving the write actually landed). Check "View trace log" on the main screen right after pressing a volume button on the head unit - if both lines show up correctly there and the native popup still appears, that popup isn't tied to the standard Android volume key at all (some OEM launchers show their own volume indicator purely off the stream value changing, independent of who changed it or FLAG_SHOW_UI) and nothing at this app's level can suppress it. If neither line shows up, the accessibility service isn't actually intercepting on that hardware, which points to a different problem.
 
