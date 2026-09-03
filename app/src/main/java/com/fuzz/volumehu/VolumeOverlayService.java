@@ -73,6 +73,9 @@ public class VolumeOverlayService extends Service {
     private static final long TAP_MAX_MS = 350;
     private static final long THEME_HOLD_MS = 2000;
     private static final long NUDGE_COOLDOWN_MS = 500;
+    /** Panel auto-closes back to the bubble after this long with no
+     *  interaction - see scheduleAutoClosePanel(). */
+    private static final long AUTO_CLOSE_PANEL_MS = 5000;
 
     // Size tab slider ranges (dp) - min value + seekbar's 0-based progress.
     private static final int BUBBLE_WIDTH_MIN_DP = 36, BUBBLE_WIDTH_MAX_DP = 90;
@@ -549,6 +552,20 @@ public class VolumeOverlayService extends Service {
 
     // ---------------------------------------------------------- Panel window
 
+    /** Auto-closes the panel back to the bubble after AUTO_CLOSE_PANEL_MS of
+     *  no interaction - scheduleAutoClosePanel() (re)arms it on open and on
+     *  every real interaction (drag, nudge, theme-hold), and it stands down
+     *  entirely while the settings popup is open (an active configuration
+     *  session shouldn't get yanked away), resuming fresh once that closes. */
+    private final Runnable autoClosePanelRunnable = () -> {
+        if (panelAdded && !themePopupAdded) closePanel();
+    };
+
+    private void scheduleAutoClosePanel() {
+        mainHandler.removeCallbacks(autoClosePanelRunnable);
+        if (panelAdded && !themePopupAdded) mainHandler.postDelayed(autoClosePanelRunnable, AUTO_CLOSE_PANEL_MS);
+    }
+
     private void openPanel() {
         try {
             addPanelBackdrop(); // added first so panelRoot (added next) draws on top and keeps its own touches
@@ -673,11 +690,13 @@ public class VolumeOverlayService extends Service {
             panelParams.y = endY;
             if (panelAdded) wm.updateViewLayout(panelRoot, panelParams);
             refreshVisuals();
+            scheduleAutoClosePanel();
         } catch (Exception ignored) {}
     }
 
     private void closePanel() {
-        hideThemePopup();
+        hideThemePopup(); // may itself reschedule the auto-close timer (settings just closed) - cancelled again right below
+        mainHandler.removeCallbacks(autoClosePanelRunnable);
         try {
             if (panelAdded) {
                 wm.removeView(panelRoot);
@@ -745,7 +764,7 @@ public class VolumeOverlayService extends Service {
         collapseBtn.setOnClickListener(v -> closePanel());
         nudgeBtn.setOnClickListener(v -> onNudgeClick());
         eqBar.setListener(new EqBarView.Listener() {
-            @Override public void onDragValue(int value0toMax) { setRealVolume(value0toMax); }
+            @Override public void onDragValue(int value0toMax) { setRealVolume(value0toMax); scheduleAutoClosePanel(); }
             @Override public void onDragEnd() { /* already applied live */ }
         });
     }
@@ -1093,6 +1112,7 @@ public class VolumeOverlayService extends Service {
 
     private void onNudgeClick() {
         try {
+            scheduleAutoClosePanel();
             if (nudgeLocked) return;
             int raw = getRawVolume();
             if (raw >= widgetMax) return;
@@ -1125,6 +1145,7 @@ public class VolumeOverlayService extends Service {
     private boolean onThemeHoldTouchInner(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                scheduleAutoClosePanel();
                 themeDownX = event.getRawX();
                 themeDownY = event.getRawY();
                 themeMoved = false;
@@ -1225,6 +1246,7 @@ public class VolumeOverlayService extends Service {
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "hideThemePopup failed", e);
         }
+        scheduleAutoClosePanel(); // settings closed, focus is back on the plain panel - resume the countdown fresh
     }
 
     private void populateThemeGrid() {

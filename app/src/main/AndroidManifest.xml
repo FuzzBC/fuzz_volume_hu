@@ -67,27 +67,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- "Block system volume popup" (MainActivity toggle, off by
-             default). Only takes over the volume keys when that toggle is
-             on - checked fresh from Prefs on every key press, not cached,
-             so switching it off in the app takes effect immediately without
-             needing to re-grant/restart anything. Requires the user to
-             separately enable this service under Android's own
-             Accessibility settings - the toggle alone can't do that, only
-             guide them there (see MainActivity.toggleBlockNativeVolumeUi()). -->
-        <service
-            android:name=".VolumeKeyAccessibilityService"
-            android:exported="true"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
     </application>
 
 </manifest>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.039
+- **Removes "Block system volume popup" entirely** - the main-screen toggle, VolumeKeyAccessibilityService, and its Accessibility permission. Across 1.028-1.038 this went through key interception, a window-watch dismiss attempt, and a window-watch identify-only version, but on real hardware the native popup either kept showing anyway or (briefly, in 1.036) the dismiss attempt itself misfired into whatever app had focus. Removed rather than keep shipping a permission-sensitive feature that never reliably delivered what it was for.
+- The volume panel now auto-closes back to the bubble after 5 seconds with no interaction, instead of staying open until manually collapsed - dragging the bar, tapping nudge, or holding to open settings all reset the countdown, and it stands down entirely while the settings popup is open (an active configuration session doesn't get yanked away), resuming fresh once that's closed.
+
 ## 1.038
 - Adds "which app is actually showing that popup" diagnostics for the head-unit report where the native volume UI still appears despite blocking: VolumeKeyAccessibilityService now also logs the package + class name of any window that shows up within 3 seconds of a volume press (not filtered by package name - a head unit's vendor popup won't necessarily be "com.android.systemui" the way it is on a Samsung, so guessing names up front would just miss it; filtered by timing instead, so normal navigation doesn't flood the log). No action is taken on what's found, purely identification - check "View trace log" after pressing a volume button on the head unit for a "Window shown ...ms after volume press: pkg=... cls=..." line. **Important:** Android caches an accessibility service's event subscriptions at the moment it's enabled, so this new logging won't start until the service is toggled off and back on in Android Settings > Accessibility after updating - reinstalling alone isn't enough.
 

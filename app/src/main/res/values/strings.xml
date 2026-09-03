@@ -10,7 +10,4 @@
     <string name="check_updates">Check for updates</string>
     <string name="battery_opt_prompt">Exempt from battery optimization</string>
     <string name="view_trace_log">View trace log</string>
-    <string name="accessibility_service_description">Lets FuZz Volume HU take over the volume up/down buttons, so its own panel opens instead of the system\'s volume popup. Only active while "Block system volume popup" is turned on in the app itself.</string>
-    <string name="block_volume_popup_off">Block system volume popup</string>
-    <string name="block_volume_popup_on">Unblock system volume popup</string>
 </resources>

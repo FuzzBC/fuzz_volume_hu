@@ -57,13 +57,6 @@
         android:text="@string/battery_opt_prompt" />
 
     <Button
-        android:id="@+id/blockVolumeBtn"
-        android:layout_width="260dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="10dp"
-        android:text="@string/block_volume_popup_off" />
-
-    <Button
         android:id="@+id/checkUpdateBtn"
         android:layout_width="260dp"
         android:layout_height="wrap_content"
