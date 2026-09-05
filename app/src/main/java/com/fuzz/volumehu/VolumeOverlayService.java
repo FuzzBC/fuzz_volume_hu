@@ -227,7 +227,7 @@ public class VolumeOverlayService extends Service {
 
     // Custom theme's RGB slider panel - shown only while the Custom swatch is selected
     private View customRgbPanel;
-    private SeekBar customRSeek, customGSeek, customBSeek;
+    private SeekBar customRSeek, customGSeek, customBSeek, customASeek;
     private TextView customRgbHex;
     private View customRgbPreview;
     private BroadcastReceiver ledcarColorReceiver;
@@ -885,6 +885,7 @@ public class VolumeOverlayService extends Service {
         customRSeek = themePopupRoot.findViewById(R.id.customRSeek);
         customGSeek = themePopupRoot.findViewById(R.id.customGSeek);
         customBSeek = themePopupRoot.findViewById(R.id.customBSeek);
+        customASeek = themePopupRoot.findViewById(R.id.customASeek);
         customRgbHex = themePopupRoot.findViewById(R.id.customRgbHex);
         customRgbPreview = themePopupRoot.findViewById(R.id.customRgbPreview);
         customSwatchSlot = themePopupRoot.findViewById(R.id.customSwatchSlot);
@@ -954,6 +955,7 @@ public class VolumeOverlayService extends Service {
         wireCustomRgbSeek(customRSeek);
         wireCustomRgbSeek(customGSeek);
         wireCustomRgbSeek(customBSeek);
+        wireCustomRgbSeek(customASeek);
 
         populateThemeGrid();
         setCustomRgbPanelVisible(themeIndex == CUSTOM_THEME_INDEX); // reopening the popup with Custom already active
@@ -965,14 +967,14 @@ public class VolumeOverlayService extends Service {
 
     /** Live-updates customColor (and the whole widget's visuals) on every
      *  tick while dragging, same "smooth while dragging, commit on release"
-     *  split as onSeek()'s Size/Conf sliders - three synchronous Prefs
+     *  split as onSeek()'s Size/Conf sliders - four synchronous Prefs
      *  writes per drag tick would be needless disk I/O for a value nothing
      *  else reads until the drag actually stops. */
     private void wireCustomRgbSeek(SeekBar sb) {
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (!fromUser) return;
-                customColor = Color.rgb(customRSeek.getProgress(), customGSeek.getProgress(), customBSeek.getProgress());
+                customColor = Color.argb(customASeek.getProgress(), customRSeek.getProgress(), customGSeek.getProgress(), customBSeek.getProgress());
                 updateCustomRgbPreview();
                 refreshVisuals();
             }
@@ -1494,6 +1496,7 @@ public class VolumeOverlayService extends Service {
             customRSeek.setProgress(Color.red(customColor));
             customGSeek.setProgress(Color.green(customColor));
             customBSeek.setProgress(Color.blue(customColor));
+            customASeek.setProgress(Color.alpha(customColor));
             updateCustomRgbPreview();
         }
         // The popup window is WRAP_CONTENT and this can change its measured
@@ -1525,7 +1528,9 @@ public class VolumeOverlayService extends Service {
         d.setColor(customColor);
         customRgbPreview.setBackground(d);
         if (customRgbHex != null) {
-            customRgbHex.setText(String.format("#%06X", customColor & 0xFFFFFF));
+            // 8-digit ARGB so the alpha slider's effect is visible in the
+            // readout too, not just #RRGGBB as if it were always opaque.
+            customRgbHex.setText(String.format("#%08X", customColor));
         }
     }
 
@@ -1854,10 +1859,16 @@ public class VolumeOverlayService extends Service {
     private static int clampInt(int v, int a, int b) { return Math.max(a, Math.min(b, v)); }
     private static float clampFloat(float v, float a, float b) { return Math.max(a, Math.min(b, v)); }
 
+    /** Interpolates alpha too, not just RGB - "a" (the neutral cream/tan
+     *  base) is always fully opaque, so this only actually changes anything
+     *  when "b" isn't: the Custom theme's own alpha slider. Every preset
+     *  theme color is opaque (Color.parseColor() on a 6-digit hex), so
+     *  nothing changes for them - interpolating 255 toward 255 stays 255. */
     private static int mixColors(int a, int b, float t) {
+        int al = Math.round(Color.alpha(a) + (Color.alpha(b) - Color.alpha(a)) * t);
         int r = Math.round(Color.red(a) + (Color.red(b) - Color.red(a)) * t);
         int g = Math.round(Color.green(a) + (Color.green(b) - Color.green(a)) * t);
         int bl = Math.round(Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t);
-        return Color.rgb(r, g, bl);
+        return Color.argb(al, r, g, bl);
     }
 }

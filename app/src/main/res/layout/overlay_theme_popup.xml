@@ -219,6 +219,21 @@
                             android:layout_height="wrap_content"
                             android:max="255"
                             android:progress="6" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="Alpha"
+                            android:textColor="@color/ink"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                        <SeekBar
+                            android:id="@+id/customASeek"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="255"
+                            android:progress="255" />
                     </LinearLayout>
 
                     <LinearLayout

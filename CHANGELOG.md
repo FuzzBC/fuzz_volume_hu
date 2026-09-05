@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.052
+- Custom theme's RGB panel gets a 4th slider: Alpha (0-255, default 255/opaque). The hex readout is now 8-digit ARGB so the effect is visible there too. Since the bubble/panel/button backgrounds are real overlay windows, dropping Alpha makes them genuinely see-through to whatever's behind - mixColors() now interpolates alpha alongside RGB, which only actually changes anything for Custom (every preset theme color is opaque, so nothing shifts for those).
+
 ## 1.051
 - Same dark-background fix as 1.050's readout text, extended to the nudge/collapse button icons and the bubble icon: ic_chevron was drawn solid black with no tint at all, so it stayed invisible-on-dark on the same saturated colors that made the readout unreadable; the bubble icon had the same problem with its old fixed dark-brown tint. Both now switch to white on a dark background, same perceptive-luminance check as the readout. Bubble icon on a Clear background (no background to contrast against) is unaffected - it still tints with the raw color itself, unchanged.
 
