@@ -245,9 +245,11 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Preset themes - below the Custom button and its RGB bars,
-                 not above them. -->
+            <!-- Preset themes - below the Custom button, and swapped out
+                 for its RGB bars (not shown alongside them) while Custom is
+                 selected, see VolumeOverlayService.setCustomRgbPanelVisible(). -->
             <ScrollView
+                android:id="@+id/themeGridScroll"
                 android:layout_width="match_parent"
                 android:layout_height="220dp">
 
@@ -503,6 +505,22 @@
                     android:layout_height="wrap_content"
                     android:max="170"
                     android:progress="60" />
+
+                <TextView
+                    android:id="@+id/panelHideLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="Hide after: 5s"
+                    android:textColor="@color/ink"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/panelHideSeek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="28"
+                    android:progress="3" />
 
                 <!-- Panel style + Panel background shape - populated at
                      runtime, see VolumeOverlayService.populatePanelList(). -->

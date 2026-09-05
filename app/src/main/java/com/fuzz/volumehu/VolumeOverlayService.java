@@ -73,9 +73,10 @@ public class VolumeOverlayService extends Service {
     private static final long TAP_MAX_MS = 350;
     private static final long THEME_HOLD_MS = 2000;
     private static final long NUDGE_COOLDOWN_MS = 500;
-    /** Panel auto-closes back to the bubble after this long with no
-     *  interaction - see scheduleAutoClosePanel(). */
-    private static final long AUTO_CLOSE_PANEL_MS = 5000;
+    // Panel tab's "Hide after" slider range (seconds) - how long the panel
+    // stays open with no interaction before auto-closing back to the bubble,
+    // see scheduleAutoClosePanel()/panelHideSeconds.
+    private static final int PANEL_HIDE_MIN_S = 2, PANEL_HIDE_MAX_S = 30;
 
     // Size tab slider ranges (dp) - min value + seekbar's 0-based progress.
     private static final int BUBBLE_WIDTH_MIN_DP = 36, BUBBLE_WIDTH_MAX_DP = 90;
@@ -160,6 +161,7 @@ public class VolumeOverlayService extends Service {
     private int bubbleWidthDp;         // Size tab - floating bubble's own size (height/icon scale with it)
     private int panelWidthDp;          // Size tab
     private int panelBarHeightDp;      // Size tab
+    private int panelHideSeconds;      // Panel tab - auto-close-to-bubble idle timer
     private int maxVolumeSupported;    // Conf tab: EQ bar's full-scale top
     private int widgetMax;             // Conf tab: "limited to" - this widget's write ceiling
     private int dragCap;               // Conf tab: "when go slowly" - direct-drag ceiling
@@ -205,6 +207,7 @@ public class VolumeOverlayService extends Service {
     private WindowManager.LayoutParams themePopupParams;
     private boolean themePopupAdded = false;
     private GridLayout themeGrid;
+    private View themeGridScroll; // the grid's own ScrollView - hidden while the Custom RGB panel is showing, see setCustomRgbPanelVisible()
     private TextView themeCurrent;
     private final View[] themeSwatches = new View[ThemeColors.THEMES.length];
     private View customSwatch; // the "Custom" swatch - lives in customSwatchSlot, not part of THEMES/themeGrid/themeSwatches
@@ -237,10 +240,10 @@ public class VolumeOverlayService extends Service {
     // Panel tab: width/height (moved from the old Size tab), then Panel
     // style and Panel background pickers (moved from the old Form tab).
     private LinearLayout panelList;
-    private TextView panelWidthLabel, panelHeightLabel;
+    private TextView panelWidthLabel, panelHeightLabel, panelHideLabel;
     private final View[] formRows = new View[EqBarView.FORM_NAMES.length];
     private final View[] panelBgRows = new View[BG_SHAPE_NAMES.length];
-    private SeekBar bubbleSizeSeek, panelWidthSeek, panelHeightSeek;
+    private SeekBar bubbleSizeSeek, panelWidthSeek, panelHeightSeek, panelHideSeek;
 
     // Conf tab
     private TextView confMaxLabel, confLimitLabel, confSlowLabel, confDeviceMaxHint;
@@ -297,6 +300,7 @@ public class VolumeOverlayService extends Service {
             bubbleWidthDp = prefs.getBubbleWidthDp();
             panelWidthDp = prefs.getPanelWidthDp();
             panelBarHeightDp = Math.min(prefs.getPanelBarHeightDp(), maxPanelBarHeightDp());
+            panelHideSeconds = clampInt(prefs.getPanelHideSeconds(), PANEL_HIDE_MIN_S, PANEL_HIDE_MAX_S);
             // Defensive clamp on load - Conf tab's tiers must stay ordered
             // (maxVolumeSupported >= widgetMax >= dragCap) even if a future
             // change to the defaults ever left a stale combination behind.
@@ -597,18 +601,19 @@ public class VolumeOverlayService extends Service {
 
     // ---------------------------------------------------------- Panel window
 
-    /** Auto-closes the panel back to the bubble after AUTO_CLOSE_PANEL_MS of
-     *  no interaction - scheduleAutoClosePanel() (re)arms it on open and on
-     *  every real interaction (drag, nudge, theme-hold), and it stands down
-     *  entirely while the settings popup is open (an active configuration
-     *  session shouldn't get yanked away), resuming fresh once that closes. */
+    /** Auto-closes the panel back to the bubble after panelHideSeconds (Panel
+     *  tab's "Hide after" slider) of no interaction - scheduleAutoClosePanel()
+     *  (re)arms it on open and on every real interaction (drag, nudge,
+     *  theme-hold), and it stands down entirely while the settings popup is
+     *  open (an active configuration session shouldn't get yanked away),
+     *  resuming fresh once that closes. */
     private final Runnable autoClosePanelRunnable = () -> {
         if (panelAdded && !themePopupAdded) closePanel();
     };
 
     private void scheduleAutoClosePanel() {
         mainHandler.removeCallbacks(autoClosePanelRunnable);
-        if (panelAdded && !themePopupAdded) mainHandler.postDelayed(autoClosePanelRunnable, AUTO_CLOSE_PANEL_MS);
+        if (panelAdded && !themePopupAdded) mainHandler.postDelayed(autoClosePanelRunnable, panelHideSeconds * 1000L);
     }
 
     private void openPanel() {
@@ -846,6 +851,7 @@ public class VolumeOverlayService extends Service {
     private void inflateThemePopup() {
         themePopupRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_theme_popup, null);
         themeGrid = themePopupRoot.findViewById(R.id.themeGrid);
+        themeGridScroll = themePopupRoot.findViewById(R.id.themeGridScroll);
         themeCurrent = themePopupRoot.findViewById(R.id.themeCurrent);
         Button themeDone = themePopupRoot.findViewById(R.id.themeDone);
         ImageButton themeClose = themePopupRoot.findViewById(R.id.themeClose);
@@ -874,9 +880,11 @@ public class VolumeOverlayService extends Service {
         bubbleSizeLabel = themePopupRoot.findViewById(R.id.bubbleSizeLabel);
         panelWidthLabel = themePopupRoot.findViewById(R.id.panelWidthLabel);
         panelHeightLabel = themePopupRoot.findViewById(R.id.panelHeightLabel);
+        panelHideLabel = themePopupRoot.findViewById(R.id.panelHideLabel);
         bubbleSizeSeek = themePopupRoot.findViewById(R.id.bubbleSizeSeek);
         panelWidthSeek = themePopupRoot.findViewById(R.id.panelWidthSeek);
         panelHeightSeek = themePopupRoot.findViewById(R.id.panelHeightSeek);
+        panelHideSeek = themePopupRoot.findViewById(R.id.panelHideSeek);
 
         confMaxLabel = themePopupRoot.findViewById(R.id.confMaxLabel);
         confLimitLabel = themePopupRoot.findViewById(R.id.confLimitLabel);
@@ -1024,6 +1032,7 @@ public class VolumeOverlayService extends Service {
         bubbleSizeSeek.setMax(BUBBLE_WIDTH_MAX_DP - BUBBLE_WIDTH_MIN_DP);
         panelWidthSeek.setMax(PANEL_WIDTH_MAX_DP - PANEL_WIDTH_MIN_DP);
         panelHeightSeek.setMax(Math.max(1, maxPanelBarHeightDp() - PANEL_BAR_HEIGHT_MIN_DP));
+        panelHideSeek.setMax(PANEL_HIDE_MAX_S - PANEL_HIDE_MIN_S);
         syncSizeTabUI();
 
         onSeek(bubbleSizeSeek, v -> {
@@ -1042,6 +1051,10 @@ public class VolumeOverlayService extends Service {
             applyBarHeightLive();
             if (panelAdded) positionPanel();
         });
+        onSeek(panelHideSeek, v -> {
+            panelHideSeconds = PANEL_HIDE_MIN_S + v;
+            panelHideLabel.setText("Hide after: " + panelHideSeconds + "s");
+        });
     }
 
     private void syncSizeTabUI() {
@@ -1052,6 +1065,8 @@ public class VolumeOverlayService extends Service {
         panelHeightSeek.setMax(Math.max(1, maxPanelBarHeightDp() - PANEL_BAR_HEIGHT_MIN_DP));
         panelHeightSeek.setProgress(panelBarHeightDp - PANEL_BAR_HEIGHT_MIN_DP);
         panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
+        panelHideSeek.setProgress(panelHideSeconds - PANEL_HIDE_MIN_S);
+        panelHideLabel.setText("Hide after: " + panelHideSeconds + "s");
     }
 
     /** Live-resizes the floating bubble as the Bubble tab's size slider
@@ -1162,6 +1177,7 @@ public class VolumeOverlayService extends Service {
             prefs.setBubbleWidthDp(bubbleWidthDp);
             prefs.setPanelWidthDp(panelWidthDp);
             prefs.setPanelBarHeightDp(panelBarHeightDp);
+            prefs.setPanelHideSeconds(panelHideSeconds);
             prefs.setMaxVolumeSupported(maxVolumeSupported);
             prefs.setWidgetMax(widgetMax);
             prefs.setDragCap(dragCap);
@@ -1433,18 +1449,43 @@ public class VolumeOverlayService extends Service {
         }
     }
 
-    /** Shows/hides the Custom swatch's RGB slider panel and, when opening
-     *  it, syncs the three sliders to whatever customColor currently is -
-     *  covers reopening the settings popup with Custom already selected
-     *  from a previous session, not just the initial tap. */
+    /** Shows/hides the Custom swatch's RGB slider panel - swapped with the
+     *  preset theme grid, never shown alongside it, so picking Custom
+     *  doesn't grow the popup taller: press Custom to collapse the grid
+     *  down to just the RGB bars, press it again to collapse the bars back
+     *  to the grid and pick a preset instead. When opening, syncs the three
+     *  sliders to whatever customColor currently is - covers reopening the
+     *  settings popup with Custom already selected from a previous session,
+     *  not just the initial tap. */
     private void setCustomRgbPanelVisible(boolean visible) {
         if (customRgbPanel == null) return;
         customRgbPanel.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (themeGridScroll != null) themeGridScroll.setVisibility(visible ? View.GONE : View.VISIBLE);
         if (visible) {
             customRSeek.setProgress(Color.red(customColor));
             customGSeek.setProgress(Color.green(customColor));
             customBSeek.setProgress(Color.blue(customColor));
             updateCustomRgbPreview();
+        }
+        // The popup window is WRAP_CONTENT and this can change its measured
+        // height by a lot (RGB bars vs. the 220dp grid) - re-layout and
+        // re-clamp Y the same way selectSettingsTab() does for a tab switch,
+        // so a popup sitting low on screen doesn't run off the bottom edge.
+        if (themePopupAdded) {
+            wm.updateViewLayout(themePopupRoot, themePopupParams);
+            themePopupRoot.post(() -> {
+                try {
+                    if (!themePopupAdded) return;
+                    int actualH = themePopupRoot.getHeight();
+                    if (actualH <= 0) return;
+                    Point sz = screenSize();
+                    int clampedY = clampInt(themePopupParams.y, 0, Math.max(0, sz.y - actualH));
+                    if (clampedY != themePopupParams.y) {
+                        themePopupParams.y = clampedY;
+                        wm.updateViewLayout(themePopupRoot, themePopupParams);
+                    }
+                } catch (Exception ignored) {}
+            });
         }
     }
 

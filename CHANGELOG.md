@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.046
+- Panel tab gets a "Hide after" slider (2-30s, default 5s) - now configurable instead of the fixed 5 seconds the panel's auto-close-to-bubble idle timer used since it was added.
+- Theme tab: picking Custom no longer grows the popup taller - its RGB bars now replace the preset theme grid entirely instead of adding onto it (never shown together). Press Custom again to collapse the bars back down to the grid and pick a preset instead.
+
 ## 1.045
 - Removed the small fake bubble-size preview swatch next to the Bubble tab's size slider - redundant now that this tab shows the real floating bubble live behind the dialog (1.043), so the slider's effect was already visible on the actual bubble.
 

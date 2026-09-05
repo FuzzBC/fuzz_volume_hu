@@ -53,6 +53,7 @@ public class Prefs {
     private static final String KEY_BUBBLE_WIDTH = "bubble_width_dp"; // floating bubble's own size - height/icon scale with it
     private static final String KEY_PANEL_WIDTH = "panel_width_dp";
     private static final String KEY_PANEL_BAR_HEIGHT = "panel_bar_height_dp";
+    private static final String KEY_PANEL_HIDE_SECONDS = "panel_hide_seconds"; // Panel tab - auto-close-to-bubble idle timer
 
     // Conf tab
     private static final String KEY_MAX_VOLUME_SUPPORTED = "max_volume_supported"; // top of the EQ bar's scale
@@ -66,6 +67,7 @@ public class Prefs {
     public static final int DEFAULT_BUBBLE_WIDTH_DP = 52;
     public static final int DEFAULT_PANEL_WIDTH_DP = 150;
     public static final int DEFAULT_PANEL_BAR_HEIGHT_DP = 150;
+    public static final int DEFAULT_PANEL_HIDE_SECONDS = 5;
     public static final int DEFAULT_MAX_VOLUME_SUPPORTED = 40;
     public static final int DEFAULT_WIDGET_MAX = 25;
     public static final int DEFAULT_DRAG_CAP = 20;
@@ -125,6 +127,9 @@ public class Prefs {
 
     public int getPanelBarHeightDp() { return sp.getInt(KEY_PANEL_BAR_HEIGHT, DEFAULT_PANEL_BAR_HEIGHT_DP); }
     public void setPanelBarHeightDp(int dp) { sp.edit().putInt(KEY_PANEL_BAR_HEIGHT, dp).commit(); }
+
+    public int getPanelHideSeconds() { return sp.getInt(KEY_PANEL_HIDE_SECONDS, DEFAULT_PANEL_HIDE_SECONDS); }
+    public void setPanelHideSeconds(int seconds) { sp.edit().putInt(KEY_PANEL_HIDE_SECONDS, seconds).commit(); }
 
     public int getMaxVolumeSupported() { return sp.getInt(KEY_MAX_VOLUME_SUPPORTED, DEFAULT_MAX_VOLUME_SUPPORTED); }
     public void setMaxVolumeSupported(int v) { sp.edit().putInt(KEY_MAX_VOLUME_SUPPORTED, v).commit(); }
