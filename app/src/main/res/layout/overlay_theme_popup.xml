@@ -138,17 +138,17 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="230dp">
-
-                <GridLayout
-                    android:id="@+id/themeGrid"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:columnCount="4"
-                    android:padding="8dp" />
-            </ScrollView>
+            <!-- Custom swatch - its own row above the preset grid, not part
+                 of it, so its RGB picker (right below) always sits right
+                 under this button instead of below the whole scrollable
+                 grid. Populated at runtime - see
+                 VolumeOverlayService.populateThemeGrid(). -->
+            <FrameLayout
+                android:id="@+id/customSwatchSlot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="8dp" />
 
             <!-- Custom swatch's own RGB picker - hidden unless Custom is
                  the selected theme; see VolumeOverlayService.setCustomRgbPanelVisible(). -->
@@ -244,6 +244,20 @@
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- Preset themes - below the Custom button and its RGB bars,
+                 not above them. -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="220dp">
+
+                <GridLayout
+                    android:id="@+id/themeGrid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:columnCount="4"
+                    android:padding="8dp" />
+            </ScrollView>
 
             <LinearLayout
                 android:layout_width="match_parent"

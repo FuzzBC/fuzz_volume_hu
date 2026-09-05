@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.044
+- Theme tab layout: the Custom swatch now sits in its own row above the preset color grid, not as the grid's first cell - its RGB bars open right underneath that button (still toggling open/closed on repeat taps of Custom, unchanged), with all 90 preset theme swatches below both instead of above them.
+
 ## 1.043
 - Bubble tab now shows the real floating bubble instead of the (dimmed, unrelated) volume panel behind the settings dialog: since Bubble tab's own settings - background shape, icon - only ever show on the actual bubble, and the bubble doesn't normally exist while the panel is open, switching to this tab temporarily hides the panel and brings the real bubble window back so changes here show live on the real thing, not just the small size-preview swatch. Switching to any other tab (or closing Settings) restores the panel exactly as it was.
 

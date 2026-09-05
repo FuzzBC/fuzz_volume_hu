@@ -207,7 +207,8 @@ public class VolumeOverlayService extends Service {
     private GridLayout themeGrid;
     private TextView themeCurrent;
     private final View[] themeSwatches = new View[ThemeColors.THEMES.length];
-    private View customSwatch; // the "Custom" swatch - prepended to themeGrid, not part of THEMES/themeSwatches
+    private View customSwatch; // the "Custom" swatch - lives in customSwatchSlot, not part of THEMES/themeGrid/themeSwatches
+    private FrameLayout customSwatchSlot; // its own row above the preset grid - see populateThemeGrid()
     private CheckBox dynamicCheck;
     private CheckBox ledcarSyncCheck;
 
@@ -858,6 +859,7 @@ public class VolumeOverlayService extends Service {
         customBSeek = themePopupRoot.findViewById(R.id.customBSeek);
         customRgbHex = themePopupRoot.findViewById(R.id.customRgbHex);
         customRgbPreview = themePopupRoot.findViewById(R.id.customRgbPreview);
+        customSwatchSlot = themePopupRoot.findViewById(R.id.customSwatchSlot);
 
         tabTheme = themePopupRoot.findViewById(R.id.tabTheme);
         tabConf = themePopupRoot.findViewById(R.id.tabConf);
@@ -1354,11 +1356,14 @@ public class VolumeOverlayService extends Service {
     private void populateThemeGrid() {
         themeGrid.removeAllViews();
 
-        // "Custom" always sits first - its own RGB, not one of ThemeColors.THEMES.
-        // Tapping it selects it (like any other swatch) and toggles the RGB
-        // slider panel open/closed, so the sliders are only ever showing
-        // while there's actually a Custom color to be tuning.
-        customSwatch = LayoutInflater.from(themedCtx).inflate(R.layout.theme_swatch_item, themeGrid, false);
+        // "Custom" gets its own row above the preset grid (customSwatchSlot,
+        // not themeGrid) so its RGB panel always sits right under this
+        // button, with the preset themes below both - not one of
+        // ThemeColors.THEMES. Tapping it selects it (like any other swatch)
+        // and toggles the RGB slider panel open/closed, so the sliders are
+        // only ever showing while there's actually a Custom color to tune.
+        customSwatchSlot.removeAllViews();
+        customSwatch = LayoutInflater.from(themedCtx).inflate(R.layout.theme_swatch_item, customSwatchSlot, false);
         View customBall = customSwatch.findViewById(R.id.ball);
         TextView customName = customSwatch.findViewById(R.id.tname);
         customName.setText("Custom");
@@ -1377,7 +1382,7 @@ public class VolumeOverlayService extends Service {
                 android.util.Log.e("VolumeOverlayService", "custom swatch click failed", e);
             }
         });
-        themeGrid.addView(customSwatch);
+        customSwatchSlot.addView(customSwatch);
 
         ThemeColors.Theme[] themes = ThemeColors.THEMES;
         for (int i = 0; i < themes.length; i++) {
