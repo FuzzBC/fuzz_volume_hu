@@ -1744,12 +1744,14 @@ public class VolumeOverlayService extends Service {
     private void applyPanelTheme(int color) {
         if (panelRoot == null) return;
         View panelCard = panelRoot.findViewById(R.id.panelCard);
+        int cardBgColor = color; // Clear (no background) falls back to the raw color as the best available contrast signal
         if (panelCard != null) {
             if (panelBgShape == 4) {
                 panelCard.setBackground(null); // Clear
             } else {
                 GradientDrawable cardBg = new GradientDrawable();
-                cardBg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, SURFACE_TINT_STRENGTH));
+                cardBgColor = mixColors(Color.parseColor("#E6E2D8"), color, SURFACE_TINT_STRENGTH);
+                cardBg.setColor(cardBgColor);
                 switch (panelBgShape) {
                     case 1: cardBg.setCornerRadius(dp(18)); break; // Rounded
                     case 2: cardBg.setCornerRadius(0); break; // Square
@@ -1759,9 +1761,37 @@ public class VolumeOverlayService extends Service {
                 panelCard.setBackground(cardBg);
             }
         }
+        applyReadoutTextContrast(cardBgColor);
         tintSmallButton(nudgeBtn, color);
         tintSmallButton(collapseBtn, color);
         if (holdProgressFill != null) holdProgressFill.setBackgroundColor(color);
+    }
+
+    /** Now that the card background can be a genuinely dark, saturated color
+     *  (SURFACE_TINT_STRENGTH raised in 1.049), the readout text's original
+     *  fixed dark-ink color goes unreadable on the darker themes/high-volume
+     *  end of Dynamic mode - volNum/volMax now switch to white on a dark
+     *  background, ink on a light one, each with a soft dark shadow so the
+     *  number stays legible either way against a busy/saturated card color. */
+    private void applyReadoutTextContrast(int backgroundColor) {
+        if (volNum == null) return;
+        boolean dark = isColorDark(backgroundColor);
+        int numColor = dark ? Color.WHITE : ContextCompat.getColor(this, R.color.ink);
+        int maxColor = dark ? Color.parseColor("#D8D0BE") : ContextCompat.getColor(this, R.color.ink_dim);
+        volNum.setTextColor(numColor);
+        volNum.setShadowLayer(dp(2.5f), 0, dp(1), Color.argb(90, 0, 0, 0));
+        if (volMax != null) {
+            volMax.setTextColor(maxColor);
+            volMax.setShadowLayer(dp(2), 0, dp(1), Color.argb(80, 0, 0, 0));
+        }
+    }
+
+    /** Standard perceptive-luminance check (ITU-R BT.601 weights) - true
+     *  below the midpoint, i.e. white text reads better on this color than
+     *  the panel's usual dark ink does. */
+    private static boolean isColorDark(int color) {
+        double luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255.0;
+        return luminance < 0.5;
     }
 
     private void tintSmallButton(View btn, int color) {

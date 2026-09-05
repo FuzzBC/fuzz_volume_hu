@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.050
+- Volume readout text (the big number + "/25") now switches to white on a dark panel background instead of staying its usual dark ink - now that 1.049 lets the card show genuinely dark, saturated colors, dark-on-dark was unreadable on those themes and at the high-volume end of Dynamic mode. Both now also carry a soft shadow so the number stays legible against a busy/saturated card color either way.
+
 ## 1.049
 - **Fixes washed-out colors on the actual bubble/panel/buttons**, not just the theme swatches (1.048 fixed those): the real widget backgrounds mixed only 22-40% of the chosen color into a cream/tan base, so a saturated pick like pure red rendered as a pale pink - real reported symptom, "when i set Red, show very low led color". That blend ratio is now 85% real color everywhere it's used (bubble background, panel card, small buttons, and the shape-morph open animation), keeping just enough of the neutral base for the surface to still read as tinted cream rather than a flat swatch, without diluting the actual chosen color past recognition.
 
