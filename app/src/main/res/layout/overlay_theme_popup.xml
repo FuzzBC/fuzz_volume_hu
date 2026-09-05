@@ -365,51 +365,24 @@
                 android:orientation="vertical"
                 android:padding="14dp">
 
-                <LinearLayout
+                <!-- No fake preview swatch here anymore - the Bubble tab
+                     shows the real floating bubble live behind this popup
+                     (see VolumeOverlayService.showLiveBubblePreview()), so
+                     this slider's effect is visible on the actual thing. -->
+                <TextView
+                    android:id="@+id/bubbleSizeLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:text="Bubble size: 52dp"
+                    android:textColor="@color/ink"
+                    android:textSize="12sp" />
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/bubbleSizeLabel"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Bubble size: 52dp"
-                            android:textColor="@color/ink"
-                            android:textSize="12sp" />
-
-                        <SeekBar
-                            android:id="@+id/bubbleSizeSeek"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:max="54"
-                            android:progress="16" />
-                    </LinearLayout>
-
-                    <!-- Live-scaled replica of the actual floating bubble -
-                         it's the one thing this slider changes that isn't
-                         otherwise visible while this popup covers the real
-                         bubble (see VolumeOverlayService.applyBubbleSizeLive()). -->
-                    <FrameLayout
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginStart="10dp"
-                        android:background="#0A000000">
-
-                        <View
-                            android:id="@+id/bubblePreview"
-                            android:layout_width="20dp"
-                            android:layout_height="40dp"
-                            android:layout_gravity="center" />
-                    </FrameLayout>
-                </LinearLayout>
+                <SeekBar
+                    android:id="@+id/bubbleSizeSeek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="54"
+                    android:progress="16" />
 
                 <!-- Bubble background shape + the 16-icon picker - populated
                      at runtime, see VolumeOverlayService.populateBubbleList(). -->

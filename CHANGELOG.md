@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.045
+- Removed the small fake bubble-size preview swatch next to the Bubble tab's size slider - redundant now that this tab shows the real floating bubble live behind the dialog (1.043), so the slider's effect was already visible on the actual bubble.
+
 ## 1.044
 - Theme tab layout: the Custom swatch now sits in its own row above the preset color grid, not as the grid's first cell - its RGB bars open right underneath that button (still toggling open/closed on repeat taps of Custom, unchanged), with all 90 preset theme swatches below both instead of above them.
 

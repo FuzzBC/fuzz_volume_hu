@@ -231,7 +231,6 @@ public class VolumeOverlayService extends Service {
     // Bubble background and Bubble icon pickers (moved from the old Form tab).
     private LinearLayout bubbleList;
     private TextView bubbleSizeLabel;
-    private View bubblePreview;
     private final View[] bubbleBgRows = new View[BG_SHAPE_NAMES.length];
     private final View[] iconRows = new View[ICON_NAMES.length];
 
@@ -876,7 +875,6 @@ public class VolumeOverlayService extends Service {
         panelWidthLabel = themePopupRoot.findViewById(R.id.panelWidthLabel);
         panelHeightLabel = themePopupRoot.findViewById(R.id.panelHeightLabel);
         bubbleSizeSeek = themePopupRoot.findViewById(R.id.bubbleSizeSeek);
-        bubblePreview = themePopupRoot.findViewById(R.id.bubblePreview);
         panelWidthSeek = themePopupRoot.findViewById(R.id.panelWidthSeek);
         panelHeightSeek = themePopupRoot.findViewById(R.id.panelHeightSeek);
 
@@ -1057,12 +1055,11 @@ public class VolumeOverlayService extends Service {
     }
 
     /** Live-resizes the floating bubble as the Bubble tab's size slider
-     *  moves. positionTab() updates the real tab window immediately when
-     *  it's actually showing (see showLiveBubblePreview() - true whenever
-     *  this slider is even reachable, since it only lives on the Bubble
-     *  tab), and applies the new size to tabParams regardless for whenever
-     *  the tab window is next shown otherwise; refreshVisuals() also keeps
-     *  the small size-preview swatch next to the slider in sync. */
+     *  moves. This slider only lives on the Bubble tab, which always has
+     *  the real bubble window showing while it's open (see
+     *  showLiveBubblePreview()), so positionTab() applying the new size to
+     *  the real tabParams every tick is itself the live preview - no
+     *  separate fake swatch needed. */
     private void applyBubbleSizeLive() {
         positionTab();
         refreshVisuals();
@@ -1603,7 +1600,6 @@ public class VolumeOverlayService extends Service {
             }
             if (themePopupAdded) {
                 refreshThemeGridSelection();
-                updateBubblePreview(color);
             }
         } catch (Exception e) {
             android.util.Log.e("VolumeOverlayService", "refreshVisuals failed", e);
@@ -1652,9 +1648,8 @@ public class VolumeOverlayService extends Service {
         icon.setLayoutParams(lp);
     }
 
-    /** Builds the bubble's background - shared between the real floating
-     *  bubble and its live preview on the Size tab (see updateBubblePreview()).
-     *  Null means "Clear" - no drawable, caller must handle that (setBackground(null) is fine). */
+    /** Builds the real floating bubble's own background. Null means "Clear" -
+     *  no drawable, caller must handle that (setBackground(null) is fine). */
     private GradientDrawable buildBubbleDrawable(int shape, int volumeColor) {
         if (shape == 4) return null; // Clear
         GradientDrawable bg = new GradientDrawable();
@@ -1697,35 +1692,6 @@ public class VolumeOverlayService extends Service {
         tintSmallButton(nudgeBtn, color);
         tintSmallButton(collapseBtn, color);
         if (holdProgressFill != null) holdProgressFill.setBackgroundColor(color);
-    }
-
-    /** Live-scaled replica of the actual floating bubble, shown on the Size
-     *  tab next to "Bubble size" - the real bubble is hidden behind the
-     *  panel/popup while this is open, so without this the slider's effect
-     *  on the bubble's own size wouldn't be visible until everything closes. */
-    private void updateBubblePreview(int color) {
-        if (bubblePreview == null) return;
-        try {
-            float scale = 0.5f;
-            int maxPx = dp(50); // stay inside the 56dp preview box
-            int pw = Math.round(dp(bubbleWidthDp) * scale);
-            int ph = Math.round(dp(bubbleHeightDp()) * scale);
-            if (ph > maxPx) {
-                float s = maxPx / (float) ph;
-                pw = Math.round(pw * s);
-                ph = Math.round(ph * s);
-            }
-            ViewGroup.LayoutParams lp = bubblePreview.getLayoutParams();
-            if (lp != null) {
-                lp.width = Math.max(dp(6), pw);
-                lp.height = Math.max(dp(6), ph);
-                bubblePreview.setLayoutParams(lp);
-            }
-            GradientDrawable d = buildBubbleDrawable(bubbleBgShape, color);
-            bubblePreview.setBackground(d);
-        } catch (Exception e) {
-            android.util.Log.e("VolumeOverlayService", "updateBubblePreview failed", e);
-        }
     }
 
     private void tintSmallButton(View btn, int color) {
