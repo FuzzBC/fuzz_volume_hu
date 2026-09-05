@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -93,7 +94,7 @@ public class VolumeOverlayService extends Service {
     // width. TAB_ICON_RATIO is a little bigger than the bubble's original
     // 22/52 icon-to-width ratio.
     private static final float TAB_ASPECT = 108f / 52f;
-    private static final float TAB_ICON_RATIO = 0.40f; // was ~0.34 (17.6/52) - "a little larger"
+    private static final float TAB_ICON_RATIO = 0.80f; // 80% of the bubble's own width - scales with it via updateTabAppearance()
     // The settings popup card's own size is fixed - only the bubble and
     // the volume panel are user-resizable (Size tab).
     private static final int SETTINGS_POPUP_DIAMETER_DP = 260;
@@ -480,6 +481,19 @@ public class VolumeOverlayService extends Service {
     private void buildTabView() {
         tabRoot = LayoutInflater.from(themedCtx).inflate(R.layout.overlay_tab, null);
         tabRoot.setOnTouchListener(this::onTabTouch);
+
+        // Drop shadow on the icon glyph itself, not a rectangular one behind
+        // the whole ImageView (elevation/outline shadows would just be a box,
+        // wrong for a non-square icon shape) - Paint.setShadowLayer() only
+        // takes effect in a software-rendered layer, so the icon is forced
+        // into one just for this. Set once here, not per refreshVisuals()
+        // call - the paint itself never needs to change.
+        ImageView icon = tabRoot.findViewById(R.id.tabIcon);
+        if (icon != null) {
+            Paint shadowPaint = new Paint();
+            shadowPaint.setShadowLayer(dp(2), 0, dp(1.5f), Color.argb(110, 0, 0, 0));
+            icon.setLayerType(View.LAYER_TYPE_SOFTWARE, shadowPaint);
+        }
     }
 
     private WindowManager.LayoutParams newOverlayParams(int w, int h) {

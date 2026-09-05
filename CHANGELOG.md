@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.047
+- Bubble icon is now 80% of the bubble's own size (was 40%) and scales with it via the Bubble tab's size slider, same as before - just bigger.
+- Bubble icon gets a soft drop shadow, shaped to the glyph itself rather than a rectangle behind the whole icon view.
+
 ## 1.046
 - Panel tab gets a "Hide after" slider (2-30s, default 5s) - now configurable instead of the fixed 5 seconds the panel's auto-close-to-bubble idle timer used since it was added.
 - Theme tab: picking Custom no longer grows the popup taller - its RGB bars now replace the preset theme grid entirely instead of adding onto it (never shown together). Press Custom again to collapse the bars back down to the grid and pick a preset instead.
