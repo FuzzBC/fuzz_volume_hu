@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.043
+- Bubble tab now shows the real floating bubble instead of the (dimmed, unrelated) volume panel behind the settings dialog: since Bubble tab's own settings - background shape, icon - only ever show on the actual bubble, and the bubble doesn't normally exist while the panel is open, switching to this tab temporarily hides the panel and brings the real bubble window back so changes here show live on the real thing, not just the small size-preview swatch. Switching to any other tab (or closing Settings) restores the panel exactly as it was.
+
 ## 1.042
 - Settings popup reorganized: the old Size and Form tabs mixed bubble-only and panel-only controls together with no clear grouping. Now four tabs - Theme, Conf, **Bubble**, **Panel** - and everything about one specific piece lives entirely under its own tab: Bubble has bubble size + live preview, Bubble background shape, and the 16-icon picker; Panel has panel width, panel height, Panel style (the EQ bar's visual form), and Panel background shape. Nothing about what any control actually does changed, only where it lives.
 

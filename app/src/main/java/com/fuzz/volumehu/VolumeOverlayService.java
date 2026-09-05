@@ -959,6 +959,7 @@ public class VolumeOverlayService extends Service {
         styleSettingsTab(tabConf, index == 1);
         styleSettingsTab(tabBubble, index == 2);
         styleSettingsTab(tabPanel, index == 3);
+        showLiveBubblePreview(index == 2);
         // Each tab's content is a different height - re-layout the window
         // now that tabContent's measured height has changed.
         if (themePopupAdded) {
@@ -992,6 +993,29 @@ public class VolumeOverlayService extends Service {
     private void styleSettingsTab(TextView tab, boolean selected) {
         tab.setBackgroundResource(selected ? R.drawable.bg_done_button : R.drawable.bg_small_button);
         tab.setTextColor(selected ? ContextCompat.getColor(this, R.color.cream) : Color.parseColor("#8A7A5C"));
+    }
+
+    /** Bubble tab's settings (background shape, icon) only ever show on the
+     *  real floating bubble - which doesn't exist right now, since opening
+     *  the panel already swapped it out for the panel window (see
+     *  openPanel()). While on this tab, hide the (dimmed, non-interactive
+     *  behind the settings backdrop) panel and add the real bubble window
+     *  back in its place so changes here show live on the actual thing, not
+     *  just the small size-preview swatch. hideThemePopup() always restores
+     *  the panel and removes this again, whichever tab was last active. */
+    private void showLiveBubblePreview(boolean show) {
+        try {
+            if (show) {
+                if (panelRoot != null) panelRoot.setVisibility(View.INVISIBLE);
+                addTabWindow();
+                refreshVisuals();
+            } else {
+                removeTabWindow();
+                if (panelRoot != null) panelRoot.setVisibility(View.VISIBLE);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("VolumeOverlayService", "showLiveBubblePreview failed", e);
+        }
     }
 
     // ---------------------------------------------------------- Size tab
@@ -1030,12 +1054,13 @@ public class VolumeOverlayService extends Service {
         panelHeightLabel.setText("Volume panel height: " + panelBarHeightDp + "dp");
     }
 
-    /** Live-resizes the floating bubble as the Size tab's slider moves. The
-     *  tab window is usually hidden while this popup is open (the panel
-     *  took its place) - positionTab() still applies the new size to
-     *  tabParams right away for whenever the tab window reappears, but the
-     *  visible feedback while dragging comes from updateBubblePreview()
-     *  (via refreshVisuals()), the small live replica next to the slider. */
+    /** Live-resizes the floating bubble as the Bubble tab's size slider
+     *  moves. positionTab() updates the real tab window immediately when
+     *  it's actually showing (see showLiveBubblePreview() - true whenever
+     *  this slider is even reachable, since it only lives on the Bubble
+     *  tab), and applies the new size to tabParams regardless for whenever
+     *  the tab window is next shown otherwise; refreshVisuals() also keeps
+     *  the small size-preview swatch next to the slider in sync. */
     private void applyBubbleSizeLive() {
         positionTab();
         refreshVisuals();
@@ -1310,6 +1335,7 @@ public class VolumeOverlayService extends Service {
         // window isn't guaranteed to deliver a clean release event first -
         // make sure nothing adjusted this session is left only in memory.
         persistSizeAndConfPrefsNow();
+        showLiveBubblePreview(false); // undo the Bubble tab's live-bubble swap, whichever tab was last active
         try {
             if (themePopupAdded) {
                 wm.removeView(themePopupRoot);
