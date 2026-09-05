@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.051
+- Same dark-background fix as 1.050's readout text, extended to the nudge/collapse button icons and the bubble icon: ic_chevron was drawn solid black with no tint at all, so it stayed invisible-on-dark on the same saturated colors that made the readout unreadable; the bubble icon had the same problem with its old fixed dark-brown tint. Both now switch to white on a dark background, same perceptive-luminance check as the readout. Bubble icon on a Clear background (no background to contrast against) is unaffected - it still tints with the raw color itself, unchanged.
+
 ## 1.050
 - Volume readout text (the big number + "/25") now switches to white on a dark panel background instead of staying its usual dark ink - now that 1.049 lets the card show genuinely dark, saturated colors, dark-on-dark was unreadable on those themes and at the high-volume end of Dynamic mode. Both now also carry a soft shadow so the number stays legible against a busy/saturated card color either way.
 

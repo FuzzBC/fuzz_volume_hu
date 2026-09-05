@@ -1705,9 +1705,20 @@ public class VolumeOverlayService extends Service {
 
         ImageView icon = tabRoot.findViewById(R.id.tabIcon);
         icon.setImageResource(ICON_DRAWABLES[clampInt(bubbleIconIndex, 0, ICON_DRAWABLES.length - 1)]);
-        // Clear has no background to carry the volume color - tint the icon
-        // itself instead so that signal isn't lost entirely.
-        icon.setColorFilter(bubbleBgShape == 4 ? volumeColor : Color.parseColor("#77592A"));
+        if (bubbleBgShape == 4) {
+            // Clear has no background to carry the volume color at all -
+            // tint the icon itself with the raw color instead so that
+            // signal isn't lost entirely (not a contrast choice - there's
+            // no background to contrast against).
+            icon.setColorFilter(volumeColor);
+        } else {
+            // Same fix as applyReadoutTextContrast()/tintSmallButton(): the
+            // bubble's actual background can now be genuinely dark
+            // (SURFACE_TINT_STRENGTH), so the icon needs to switch to white
+            // there instead of always using the old fixed dark-brown tint.
+            int bubbleBgColor = mixColors(Color.parseColor("#E6E2D8"), volumeColor, SURFACE_TINT_STRENGTH);
+            icon.setColorFilter(isColorDark(bubbleBgColor) ? Color.WHITE : Color.parseColor("#77592A"));
+        }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) icon.getLayoutParams();
         int iconSize = dp(Math.round(bubbleWidthDp * TAB_ICON_RATIO));
         lp.width = iconSize;
@@ -1794,12 +1805,19 @@ public class VolumeOverlayService extends Service {
         return luminance < 0.5;
     }
 
-    private void tintSmallButton(View btn, int color) {
+    /** ic_chevron.xml is drawn solid black with no tint attribute, so
+     *  without this it stays black on every button color, including the
+     *  now-genuinely-dark ones SURFACE_TINT_STRENGTH can produce - same
+     *  fix as applyReadoutTextContrast(), applied to the icon itself via
+     *  colorFilter rather than a text/shadow color. */
+    private void tintSmallButton(ImageButton btn, int color) {
         if (btn == null) return;
+        int bgColor = mixColors(Color.parseColor("#DED9CC"), color, SURFACE_TINT_STRENGTH);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(mixColors(Color.parseColor("#DED9CC"), color, SURFACE_TINT_STRENGTH));
+        bg.setColor(bgColor);
         bg.setCornerRadius(dp(999)); // fully rounded (pill) - matches bg_small_button.xml
         btn.setBackground(bg);
+        btn.setColorFilter(isColorDark(bgColor) ? Color.WHITE : ContextCompat.getColor(this, R.color.ink));
     }
 
     private float[] panelCornerRadii() {
