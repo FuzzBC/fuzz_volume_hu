@@ -41,11 +41,13 @@ public class Prefs {
     private static final String KEY_DYNAMIC_COLOR = "dynamic_color"; // true: color follows volume (theme color -> red at max); false: flat theme color everywhere ("merge")
     private static final String KEY_LEDCAR_SYNC = "ledcar_sync";         // "LEDCAR Set" checkbox - mirror LEDCAR's own current color instead of the theme
     private static final String KEY_LEDCAR_LAST_COLOR = "ledcar_last_color"; // last color received from LEDCAR (-1 = none received yet)
+    private static final String KEY_CUSTOM_COLOR = "custom_theme_color"; // the "Custom" swatch's own RGB, set via its slider panel
 
     // Form tab
     private static final String KEY_FORM = "panel_form"; // index into VolumeOverlayService.FORM_NAMES / EqBarView's form styles
     private static final String KEY_PANEL_BG_SHAPE = "panel_bg_shape";   // index into VolumeOverlayService.BG_SHAPE_NAMES
     private static final String KEY_BUBBLE_BG_SHAPE = "bubble_bg_shape"; // index into VolumeOverlayService.BG_SHAPE_NAMES
+    private static final String KEY_BUBBLE_ICON = "bubble_icon"; // index into VolumeOverlayService.ICON_DRAWABLES/ICON_NAMES
 
     // Size tab (all dp)
     private static final String KEY_BUBBLE_WIDTH = "bubble_width_dp"; // floating bubble's own size - height/icon scale with it
@@ -98,6 +100,11 @@ public class Prefs {
     public int getLedcarLastColor() { return sp.getInt(KEY_LEDCAR_LAST_COLOR, -1); }
     public void setLedcarLastColor(int color) { sp.edit().putInt(KEY_LEDCAR_LAST_COLOR, color).commit(); }
 
+    /** Default is the same warm amber "Original" theme is built around, so a
+     *  first-ever look at the Custom swatch isn't some arbitrary color. */
+    public int getCustomColor() { return sp.getInt(KEY_CUSTOM_COLOR, 0xFFD97706); }
+    public void setCustomColor(int color) { sp.edit().putInt(KEY_CUSTOM_COLOR, color).commit(); }
+
     public int getForm() { return sp.getInt(KEY_FORM, 0); }
     public void setForm(int form) { sp.edit().putInt(KEY_FORM, form).commit(); }
 
@@ -106,6 +113,9 @@ public class Prefs {
 
     public int getBubbleBgShape() { return sp.getInt(KEY_BUBBLE_BG_SHAPE, 0); }
     public void setBubbleBgShape(int shape) { sp.edit().putInt(KEY_BUBBLE_BG_SHAPE, shape).commit(); }
+
+    public int getBubbleIcon() { return sp.getInt(KEY_BUBBLE_ICON, 0); }
+    public void setBubbleIcon(int icon) { sp.edit().putInt(KEY_BUBBLE_ICON, icon).commit(); }
 
     public int getBubbleWidthDp() { return sp.getInt(KEY_BUBBLE_WIDTH, DEFAULT_BUBBLE_WIDTH_DP); }
     public void setBubbleWidthDp(int dp) { sp.edit().putInt(KEY_BUBBLE_WIDTH, dp).commit(); }

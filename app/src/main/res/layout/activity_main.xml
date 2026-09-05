@@ -4,14 +4,14 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:background="@color/cream"
+    android:background="@color/main_dark_bg"
     android:padding="24dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/app_name"
-        android:textColor="@color/ink"
+        android:textColor="@color/main_dark_ink"
         android:textSize="22sp"
         android:textStyle="bold" />
 
@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:text=""
-        android:textColor="@color/ink_dim"
+        android:textColor="@color/main_dark_ink_dim"
         android:textSize="12sp" />
 
     <TextView
@@ -31,7 +31,7 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="24dp"
         android:text=""
-        android:textColor="@color/ink_dim"
+        android:textColor="@color/main_dark_ink_dim"
         android:textSize="14sp"
         android:gravity="center" />
 
@@ -40,6 +40,9 @@
         android:layout_width="260dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_done_button"
+        android:textColor="@color/cream"
+        android:textAllCaps="false"
         android:text="@string/grant_overlay" />
 
     <Button
@@ -47,6 +50,9 @@
         android:layout_width="260dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_done_button"
+        android:textColor="@color/cream"
+        android:textAllCaps="false"
         android:text="@string/start_overlay" />
 
     <Button
@@ -54,6 +60,9 @@
         android:layout_width="260dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_done_button"
+        android:textColor="@color/cream"
+        android:textAllCaps="false"
         android:text="@string/battery_opt_prompt" />
 
     <Button
@@ -61,12 +70,18 @@
         android:layout_width="260dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_done_button"
+        android:textColor="@color/cream"
+        android:textAllCaps="false"
         android:text="@string/check_updates" />
 
     <Button
         android:id="@+id/viewTraceBtn"
         android:layout_width="260dp"
         android:layout_height="wrap_content"
+        android:background="@drawable/bg_done_button"
+        android:textColor="@color/cream"
+        android:textAllCaps="false"
         android:text="@string/view_trace_log" />
 
 </LinearLayout>

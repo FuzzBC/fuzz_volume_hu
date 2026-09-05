@@ -100,6 +100,32 @@ public class VolumeOverlayService extends Service {
     /** Panel/bubble background shapes - Form tab. Index 4 ("Clear") means no
      *  background drawable at all - see buildBubbleDrawable()/applyPanelTheme(). */
     private static final String[] BG_SHAPE_NAMES = {"Themed", "Rounded", "Square", "Pill", "Clear"};
+
+    /** Bubble icon glyphs (Bubble tab), grouped into categories for the
+     *  picker list - see populateBubbleList(). Index into both arrays is
+     *  the value stored in Prefs.getBubbleIcon()/setBubbleIcon(). */
+    private static final String[] ICON_NAMES = {
+            "Classic", "Minimal", "Bold", "Hairline",                        // Classic
+            "EQ Bars", "VU Meter", "Radar", "Waveform", "Pulse Dot", "Fade Waves", // Audio levels
+            "Megaphone", "Headphones", "Volume Knob", "Geometric",           // Alternate
+            "Retro LCD", "Wheel + Wave",                                     // Thematic
+    };
+    private static final int[] ICON_DRAWABLES = {
+            R.drawable.ic_speaker, R.drawable.ic_speaker_minimal, R.drawable.ic_speaker_bold, R.drawable.ic_speaker_hairline,
+            R.drawable.ic_speaker_eqbars, R.drawable.ic_speaker_vumeter, R.drawable.ic_speaker_radar,
+            R.drawable.ic_speaker_waveform, R.drawable.ic_speaker_pulsedot, R.drawable.ic_speaker_fadewaves,
+            R.drawable.ic_speaker_megaphone, R.drawable.ic_speaker_headphones, R.drawable.ic_speaker_knob, R.drawable.ic_speaker_geometric,
+            R.drawable.ic_speaker_retrolcd, R.drawable.ic_speaker_wheelwave,
+    };
+    // Index in ICON_NAMES/ICON_DRAWABLES where each category starts, paired
+    // with the header text populateBubbleList() inserts right before it.
+    private static final int[] ICON_CATEGORY_STARTS = {0, 4, 10, 14};
+    private static final String[] ICON_CATEGORY_NAMES = {"Icon - Classic", "Icon - Audio levels", "Icon - Alternate", "Icon - Thematic"};
+
+    /** Sentinel theme index meaning "the Custom swatch, not ThemeColors.THEMES" -
+     *  negative so it can never collide with a real array index. Its color
+     *  lives in Prefs.getCustomColor()/customColor, not in THEMES. */
+    private static final int CUSTOM_THEME_INDEX = -1;
     // Conf tab slider range (volume units) for "max volume supported" - the
     // other two tiers ("limited to", "when go slowly") are bounded by
     // whichever tier sits directly above them instead of a fixed range.
@@ -126,9 +152,11 @@ public class VolumeOverlayService extends Service {
     private boolean dynamicColor;      // Theme tab: color follows volume vs. flat merge color
     private boolean ledcarSyncEnabled; // Theme tab: "LEDCAR Set" - mirror LEDCAR's own color instead of the theme, highest priority when on
     private int ledcarColor = -1;      // last color received from LEDCAR (Color.rgb-encoded); -1 = none received yet this run
+    private int customColor;           // Theme tab: the Custom swatch's own RGB - only meaningful while themeIndex == CUSTOM_THEME_INDEX
     private int formIndex;             // Form tab: index into EqBarView.FORM_NAMES
     private int panelBgShape;          // Form tab: index into BG_SHAPE_NAMES
     private int bubbleBgShape;         // Form tab: index into BG_SHAPE_NAMES
+    private int bubbleIconIndex;       // Form tab: index into ICON_NAMES/ICON_DRAWABLES
     private int bubbleWidthDp;         // Size tab - floating bubble's own size (height/icon scale with it)
     private int panelWidthDp;          // Size tab
     private int panelBarHeightDp;      // Size tab
@@ -179,24 +207,39 @@ public class VolumeOverlayService extends Service {
     private GridLayout themeGrid;
     private TextView themeCurrent;
     private final View[] themeSwatches = new View[ThemeColors.THEMES.length];
+    private View customSwatch; // the "Custom" swatch - prepended to themeGrid, not part of THEMES/themeSwatches
     private CheckBox dynamicCheck;
     private CheckBox ledcarSyncCheck;
+
+    // Custom theme's RGB slider panel - shown only while the Custom swatch is selected
+    private View customRgbPanel;
+    private SeekBar customRSeek, customGSeek, customBSeek;
+    private TextView customRgbHex;
+    private View customRgbPreview;
     private BroadcastReceiver ledcarColorReceiver;
     private boolean ledcarReceiverRegistered = false;
 
     // Popup tabs
-    private TextView tabTheme, tabSize, tabConf, tabForm;
-    private View themeTabContent, sizeTabContent, confTabContent, formTabContent;
+    // Tab order (see selectSettingsTab()): 0 Theme, 1 Conf, 2 Bubble, 3 Panel -
+    // Bubble/Panel replaced the old Size/Form split, which mixed bubble-only
+    // and panel-only controls across both tabs with no clear organization.
+    private TextView tabTheme, tabConf, tabBubble, tabPanel;
+    private View themeTabContent, confTabContent, bubbleTabContent, panelTabContent;
 
-    // Form tab
-    private LinearLayout formList;
+    // Bubble tab: size + live preview (moved from the old Size tab), then
+    // Bubble background and Bubble icon pickers (moved from the old Form tab).
+    private LinearLayout bubbleList;
+    private TextView bubbleSizeLabel;
+    private View bubblePreview;
+    private final View[] bubbleBgRows = new View[BG_SHAPE_NAMES.length];
+    private final View[] iconRows = new View[ICON_NAMES.length];
+
+    // Panel tab: width/height (moved from the old Size tab), then Panel
+    // style and Panel background pickers (moved from the old Form tab).
+    private LinearLayout panelList;
+    private TextView panelWidthLabel, panelHeightLabel;
     private final View[] formRows = new View[EqBarView.FORM_NAMES.length];
     private final View[] panelBgRows = new View[BG_SHAPE_NAMES.length];
-    private final View[] bubbleBgRows = new View[BG_SHAPE_NAMES.length];
-
-    // Size tab
-    private TextView bubbleSizeLabel, panelWidthLabel, panelHeightLabel;
-    private View bubblePreview;
     private SeekBar bubbleSizeSeek, panelWidthSeek, panelHeightSeek;
 
     // Conf tab
@@ -246,9 +289,11 @@ public class VolumeOverlayService extends Service {
             dynamicColor = prefs.isDynamicColor();
             ledcarSyncEnabled = prefs.isLedcarSync();
             ledcarColor = prefs.getLedcarLastColor();
+            customColor = prefs.getCustomColor();
             formIndex = clampInt(prefs.getForm(), 0, EqBarView.FORM_NAMES.length - 1);
             panelBgShape = clampInt(prefs.getPanelBgShape(), 0, BG_SHAPE_NAMES.length - 1);
             bubbleBgShape = clampInt(prefs.getBubbleBgShape(), 0, BG_SHAPE_NAMES.length - 1);
+            bubbleIconIndex = clampInt(prefs.getBubbleIcon(), 0, ICON_NAMES.length - 1);
             bubbleWidthDp = prefs.getBubbleWidthDp();
             panelWidthDp = prefs.getPanelWidthDp();
             panelBarHeightDp = Math.min(prefs.getPanelBarHeightDp(), maxPanelBarHeightDp());
@@ -807,16 +852,23 @@ public class VolumeOverlayService extends Service {
         ImageButton dragHandle = themePopupRoot.findViewById(R.id.dragHandle);
         dynamicCheck = themePopupRoot.findViewById(R.id.dynamicCheck);
         ledcarSyncCheck = themePopupRoot.findViewById(R.id.ledcarSyncCheck);
+        customRgbPanel = themePopupRoot.findViewById(R.id.customRgbPanel);
+        customRSeek = themePopupRoot.findViewById(R.id.customRSeek);
+        customGSeek = themePopupRoot.findViewById(R.id.customGSeek);
+        customBSeek = themePopupRoot.findViewById(R.id.customBSeek);
+        customRgbHex = themePopupRoot.findViewById(R.id.customRgbHex);
+        customRgbPreview = themePopupRoot.findViewById(R.id.customRgbPreview);
 
         tabTheme = themePopupRoot.findViewById(R.id.tabTheme);
-        tabSize = themePopupRoot.findViewById(R.id.tabSize);
         tabConf = themePopupRoot.findViewById(R.id.tabConf);
-        tabForm = themePopupRoot.findViewById(R.id.tabForm);
+        tabBubble = themePopupRoot.findViewById(R.id.tabBubble);
+        tabPanel = themePopupRoot.findViewById(R.id.tabPanel);
         themeTabContent = themePopupRoot.findViewById(R.id.themeTabContent);
-        sizeTabContent = themePopupRoot.findViewById(R.id.sizeTabContent);
         confTabContent = themePopupRoot.findViewById(R.id.confTabContent);
-        formTabContent = themePopupRoot.findViewById(R.id.formTabContent);
-        formList = themePopupRoot.findViewById(R.id.formList);
+        bubbleTabContent = themePopupRoot.findViewById(R.id.bubbleTabContent);
+        panelTabContent = themePopupRoot.findViewById(R.id.panelTabContent);
+        bubbleList = themePopupRoot.findViewById(R.id.bubbleList);
+        panelList = themePopupRoot.findViewById(R.id.panelList);
 
         bubbleSizeLabel = themePopupRoot.findViewById(R.id.bubbleSizeLabel);
         panelWidthLabel = themePopupRoot.findViewById(R.id.panelWidthLabel);
@@ -849,9 +901,9 @@ public class VolumeOverlayService extends Service {
         dragHandle.setOnTouchListener(this::onDragHandleTouch);
 
         tabTheme.setOnClickListener(v -> selectSettingsTab(0));
-        tabSize.setOnClickListener(v -> selectSettingsTab(1));
-        tabConf.setOnClickListener(v -> selectSettingsTab(2));
-        tabForm.setOnClickListener(v -> selectSettingsTab(3));
+        tabConf.setOnClickListener(v -> selectSettingsTab(1));
+        tabBubble.setOnClickListener(v -> selectSettingsTab(2));
+        tabPanel.setOnClickListener(v -> selectSettingsTab(3));
 
         dynamicCheck.setChecked(dynamicColor);
         dynamicCheck.setOnCheckedChangeListener((btn, checked) -> {
@@ -868,21 +920,45 @@ public class VolumeOverlayService extends Service {
             refreshVisuals();
         });
 
+        wireCustomRgbSeek(customRSeek);
+        wireCustomRgbSeek(customGSeek);
+        wireCustomRgbSeek(customBSeek);
+
         populateThemeGrid();
+        setCustomRgbPanelVisible(themeIndex == CUSTOM_THEME_INDEX); // reopening the popup with Custom already active
         wireSizeTab();
         wireConfTab();
-        populateFormList();
+        populateBubbleList();
+        populatePanelList();
+    }
+
+    /** Live-updates customColor (and the whole widget's visuals) on every
+     *  tick while dragging, same "smooth while dragging, commit on release"
+     *  split as onSeek()'s Size/Conf sliders - three synchronous Prefs
+     *  writes per drag tick would be needless disk I/O for a value nothing
+     *  else reads until the drag actually stops. */
+    private void wireCustomRgbSeek(SeekBar sb) {
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                customColor = Color.rgb(customRSeek.getProgress(), customGSeek.getProgress(), customBSeek.getProgress());
+                updateCustomRgbPreview();
+                refreshVisuals();
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { prefs.setCustomColor(customColor); }
+        });
     }
 
     private void selectSettingsTab(int index) {
         themeTabContent.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
-        sizeTabContent.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
-        confTabContent.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
-        formTabContent.setVisibility(index == 3 ? View.VISIBLE : View.GONE);
+        confTabContent.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
+        bubbleTabContent.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
+        panelTabContent.setVisibility(index == 3 ? View.VISIBLE : View.GONE);
         styleSettingsTab(tabTheme, index == 0);
-        styleSettingsTab(tabSize, index == 1);
-        styleSettingsTab(tabConf, index == 2);
-        styleSettingsTab(tabForm, index == 3);
+        styleSettingsTab(tabConf, index == 1);
+        styleSettingsTab(tabBubble, index == 2);
+        styleSettingsTab(tabPanel, index == 3);
         // Each tab's content is a different height - re-layout the window
         // now that tabContent's measured height has changed.
         if (themePopupAdded) {
@@ -1251,6 +1327,32 @@ public class VolumeOverlayService extends Service {
 
     private void populateThemeGrid() {
         themeGrid.removeAllViews();
+
+        // "Custom" always sits first - its own RGB, not one of ThemeColors.THEMES.
+        // Tapping it selects it (like any other swatch) and toggles the RGB
+        // slider panel open/closed, so the sliders are only ever showing
+        // while there's actually a Custom color to be tuning.
+        customSwatch = LayoutInflater.from(themedCtx).inflate(R.layout.theme_swatch_item, themeGrid, false);
+        View customBall = customSwatch.findViewById(R.id.ball);
+        TextView customName = customSwatch.findViewById(R.id.tname);
+        customName.setText("Custom");
+        GradientDrawable customBg = new GradientDrawable();
+        customBg.setColor(customColor);
+        customBg.setShape(GradientDrawable.OVAL);
+        customBall.setBackground(customBg);
+        customSwatch.setOnClickListener(v -> {
+            try {
+                boolean alreadySelected = themeIndex == CUSTOM_THEME_INDEX;
+                themeIndex = CUSTOM_THEME_INDEX;
+                prefs.setTheme(CUSTOM_THEME_INDEX);
+                refreshVisuals();
+                setCustomRgbPanelVisible(!alreadySelected || customRgbPanel.getVisibility() != View.VISIBLE);
+            } catch (Exception e) {
+                android.util.Log.e("VolumeOverlayService", "custom swatch click failed", e);
+            }
+        });
+        themeGrid.addView(customSwatch);
+
         ThemeColors.Theme[] themes = ThemeColors.THEMES;
         for (int i = 0; i < themes.length; i++) {
             final int idx = i;
@@ -1270,6 +1372,7 @@ public class VolumeOverlayService extends Service {
                     themeIndex = idx;
                     prefs.setTheme(idx);
                     refreshVisuals();
+                    setCustomRgbPanelVisible(false);
                 } catch (Exception e) {
                     android.util.Log.e("VolumeOverlayService", "theme swatch click failed", e);
                 }
@@ -1288,48 +1391,112 @@ public class VolumeOverlayService extends Service {
                 ((GradientDrawable) d).setStroke(selected ? dp(3) : 0, Color.parseColor("#3A2F1C"));
             }
         }
-        if (themeCurrent != null) themeCurrent.setText(ThemeColors.THEMES[themeIndex].name);
+        if (customSwatch != null) {
+            View customBall = customSwatch.findViewById(R.id.ball);
+            Drawable d = customBall.getBackground();
+            if (d instanceof GradientDrawable) {
+                GradientDrawable gd = (GradientDrawable) d;
+                gd.setColor(customColor); // live - reflects slider drags immediately
+                gd.setStroke(themeIndex == CUSTOM_THEME_INDEX ? dp(3) : 0, Color.parseColor("#3A2F1C"));
+            }
+        }
+        if (themeCurrent != null) {
+            themeCurrent.setText(themeIndex == CUSTOM_THEME_INDEX ? "Custom" : ThemeColors.THEMES[themeIndex].name);
+        }
     }
 
-    // ---------------------------------------------------------- Form tab
+    /** Shows/hides the Custom swatch's RGB slider panel and, when opening
+     *  it, syncs the three sliders to whatever customColor currently is -
+     *  covers reopening the settings popup with Custom already selected
+     *  from a previous session, not just the initial tap. */
+    private void setCustomRgbPanelVisible(boolean visible) {
+        if (customRgbPanel == null) return;
+        customRgbPanel.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (visible) {
+            customRSeek.setProgress(Color.red(customColor));
+            customGSeek.setProgress(Color.green(customColor));
+            customBSeek.setProgress(Color.blue(customColor));
+            updateCustomRgbPreview();
+        }
+    }
 
-    private void populateFormList() {
-        formList.removeAllViews();
+    private void updateCustomRgbPreview() {
+        if (customRgbPreview == null) return;
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(customColor);
+        customRgbPreview.setBackground(d);
+        if (customRgbHex != null) {
+            customRgbHex.setText(String.format("#%06X", customColor & 0xFFFFFF));
+        }
+    }
+
+    // ---------------------------------------------------------- Bubble tab / Panel tab pickers
+
+    /** Bubble background shape, then the 16-icon picker grouped into its
+     *  four categories - everything that only ever affects the floating
+     *  bubble, all on the Bubble tab (see class doc on tabTheme's field). */
+    private void populateBubbleList() {
+        bubbleList.removeAllViews();
+
+        addPickerSectionHeader(bubbleList, "Bubble background");
+        for (int i = 0; i < BG_SHAPE_NAMES.length; i++) {
+            final int idx = i;
+            bubbleBgRows[i] = addPickerRow(bubbleList, BG_SHAPE_NAMES[i], () -> {
+                bubbleBgShape = idx;
+                prefs.setBubbleBgShape(idx);
+                refreshPickerSelections();
+                refreshVisuals();
+            });
+        }
+
+        int categoryPos = 0;
+        for (int i = 0; i < ICON_NAMES.length; i++) {
+            if (categoryPos < ICON_CATEGORY_STARTS.length && i == ICON_CATEGORY_STARTS[categoryPos]) {
+                addPickerSectionHeader(bubbleList, ICON_CATEGORY_NAMES[categoryPos]);
+                categoryPos++;
+            }
+            final int idx = i;
+            iconRows[i] = addPickerRow(bubbleList, ICON_NAMES[i], () -> {
+                bubbleIconIndex = idx;
+                prefs.setBubbleIcon(idx);
+                refreshPickerSelections();
+                refreshVisuals();
+            });
+        }
+
+        refreshPickerSelections();
+    }
+
+    /** Panel style (the EQ bar's visual form), then Panel background shape -
+     *  everything that only ever affects the docked side panel, all on the
+     *  Panel tab. */
+    private void populatePanelList() {
+        panelList.removeAllViews();
 
         String[] names = EqBarView.FORM_NAMES;
         for (int i = 0; i < names.length; i++) {
             final int idx = i;
-            formRows[i] = addPickerRow(formList, names[i], () -> {
+            formRows[i] = addPickerRow(panelList, names[i], () -> {
                 formIndex = idx;
                 prefs.setForm(idx);
                 if (eqBar != null) eqBar.setFormIndex(idx);
-                refreshFormListSelection();
+                refreshPickerSelections();
             });
         }
 
-        addPickerSectionHeader(formList, "Panel background");
+        addPickerSectionHeader(panelList, "Panel background");
         for (int i = 0; i < BG_SHAPE_NAMES.length; i++) {
             final int idx = i;
-            panelBgRows[i] = addPickerRow(formList, BG_SHAPE_NAMES[i], () -> {
+            panelBgRows[i] = addPickerRow(panelList, BG_SHAPE_NAMES[i], () -> {
                 panelBgShape = idx;
                 prefs.setPanelBgShape(idx);
-                refreshFormListSelection();
+                refreshPickerSelections();
                 refreshVisuals();
             });
         }
 
-        addPickerSectionHeader(formList, "Bubble background");
-        for (int i = 0; i < BG_SHAPE_NAMES.length; i++) {
-            final int idx = i;
-            bubbleBgRows[i] = addPickerRow(formList, BG_SHAPE_NAMES[i], () -> {
-                bubbleBgShape = idx;
-                prefs.setBubbleBgShape(idx);
-                refreshFormListSelection();
-                refreshVisuals();
-            });
-        }
-
-        refreshFormListSelection();
+        refreshPickerSelections();
     }
 
     private void addPickerSectionHeader(LinearLayout container, String text) {
@@ -1362,7 +1529,8 @@ public class VolumeOverlayService extends Service {
         return row;
     }
 
-    private void refreshFormListSelection() {
+    private void refreshPickerSelections() {
+        styleFormRows(iconRows, bubbleIconIndex);
         styleFormRows(formRows, formIndex);
         styleFormRows(panelBgRows, panelBgShape);
         styleFormRows(bubbleBgRows, bubbleBgShape);
@@ -1422,8 +1590,13 @@ public class VolumeOverlayService extends Service {
         // sourced from LEDCAR's own current color instead of this app's
         // own theme picker.
         if (ledcarSyncEnabled && ledcarColor != -1) return ledcarColor;
-        int idx = Math.max(0, Math.min(ThemeColors.THEMES.length - 1, themeIndex));
-        int themeColor = ThemeColors.THEMES[idx].mid;
+        int themeColor;
+        if (themeIndex == CUSTOM_THEME_INDEX) {
+            themeColor = customColor;
+        } else {
+            int idx = Math.max(0, Math.min(ThemeColors.THEMES.length - 1, themeIndex));
+            themeColor = ThemeColors.THEMES[idx].mid;
+        }
         if (!dynamicColor) return themeColor;
         float frac = widgetMax <= 0 ? 0f : Math.max(0f, Math.min(1f, raw / (float) widgetMax));
         return mixColors(themeColor, Color.parseColor("#DC2626"), frac);
@@ -1434,6 +1607,7 @@ public class VolumeOverlayService extends Service {
         tabRoot.setBackground(bg);
 
         ImageView icon = tabRoot.findViewById(R.id.tabIcon);
+        icon.setImageResource(ICON_DRAWABLES[clampInt(bubbleIconIndex, 0, ICON_DRAWABLES.length - 1)]);
         // Clear has no background to carry the volume color - tint the icon
         // itself instead so that signal isn't lost entirely.
         icon.setColorFilter(bubbleBgShape == 4 ? volumeColor : Color.parseColor("#77592A"));

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.042
+- Settings popup reorganized: the old Size and Form tabs mixed bubble-only and panel-only controls together with no clear grouping. Now four tabs - Theme, Conf, **Bubble**, **Panel** - and everything about one specific piece lives entirely under its own tab: Bubble has bubble size + live preview, Bubble background shape, and the 16-icon picker; Panel has panel width, panel height, Panel style (the EQ bar's visual form), and Panel background shape. Nothing about what any control actually does changed, only where it lives.
+
+## 1.040
+- Form tab gets a "Bubble icon" picker: 16 icon options (the shipping speaker plus 15 new glyphs) grouped into four categories - Classic (Minimal/Bold/Hairline refinements of the speaker cone), Audio levels (EQ Bars/VU Meter/Radar/Waveform/Pulse Dot/Fade Waves - abstract, no cone at all), Alternate (Megaphone/Headphones/Volume Knob/Geometric), and Thematic (Retro LCD, matching the panel's own LCD form; Wheel + Wave, a nod to the head-unit itself). Whatever's picked shows on the real floating bubble immediately.
+- Theme tab's grid now opens on a "Custom" swatch: tap it to open R/G/B sliders (0-255 each) and dial in any color, with a live preview swatch and hex readout - it behaves like any other theme (Dynamic/LEDCAR Set still apply on top of it) and is remembered across restarts.
+- 30 more built-in themes, bringing the picker to 90 total.
+- Main screen (MainActivity) is now a dark screen - cream text on a near-black warm ground, dark rounded buttons - independent of the floating panel's own fixed cream skin, which is unchanged.
+
 ## 1.039
 - **Removes "Block system volume popup" entirely** - the main-screen toggle, VolumeKeyAccessibilityService, and its Accessibility permission. Across 1.028-1.038 this went through key interception, a window-watch dismiss attempt, and a window-watch identify-only version, but on real hardware the native popup either kept showing anyway or (briefly, in 1.036) the dismiss attempt itself misfired into whatever app had focus. Removed rather than keep shipping a permission-sensitive feature that never reliably delivered what it was for.
 - The volume panel now auto-closes back to the bubble after 5 seconds with no interaction, instead of staying open until manually collapsed - dragging the bar, tapping nudge, or holding to open settings all reset the countdown, and it stands down entirely while the settings popup is open (an active configuration session doesn't get yanked away), resuming fresh once that's closed.

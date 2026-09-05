@@ -2,8 +2,11 @@
 <!-- The settings popup - a small, freely-draggable card (its own overlay
      window; see VolumeOverlayService.showThemePopup()/onDragHandleTouch()),
      centered on screen the first time it's opened and remembering wherever
-     it was last dragged to after that. Three tabs: Theme (24 colors + the
-     Dynamic checkbox), Size (popup/panel dimensions), Conf (volume tiers). -->
+     it was last dragged to after that. Four tabs: Theme (colors, Custom RGB,
+     Dynamic/LEDCAR Set), Conf (volume tiers), Bubble (everything that only
+     affects the floating bubble - size, background shape, icon), Panel
+     (everything that only affects the docked side panel - width/height,
+     visual style, background shape). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="260dp"
     android:layout_height="wrap_content"
@@ -48,7 +51,7 @@
             android:contentDescription="Close" />
     </LinearLayout>
 
-    <!-- Tab row: Theme / Size / Conf. -->
+    <!-- Tab row: Theme / Conf / Bubble / Panel. -->
     <LinearLayout
         android:id="@+id/tabRow"
         android:layout_width="match_parent"
@@ -74,21 +77,6 @@
             android:background="@drawable/bg_done_button" />
 
         <TextView
-            android:id="@+id/tabSize"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:gravity="center"
-            android:padding="8dp"
-            android:text="Size"
-            android:textAllCaps="true"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:textColor="#8A7A5C"
-            android:background="@drawable/bg_small_button" />
-
-        <TextView
             android:id="@+id/tabConf"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -104,13 +92,28 @@
             android:background="@drawable/bg_small_button" />
 
         <TextView
-            android:id="@+id/tabForm"
+            android:id="@+id/tabBubble"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="Bubble"
+            android:textAllCaps="true"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#8A7A5C"
+            android:background="@drawable/bg_small_button" />
+
+        <TextView
+            android:id="@+id/tabPanel"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
             android:padding="8dp"
-            android:text="Form"
+            android:text="Panel"
             android:textAllCaps="true"
             android:textSize="10sp"
             android:textStyle="bold"
@@ -146,6 +149,101 @@
                     android:columnCount="4"
                     android:padding="8dp" />
             </ScrollView>
+
+            <!-- Custom swatch's own RGB picker - hidden unless Custom is
+                 the selected theme; see VolumeOverlayService.setCustomRgbPanelVisible(). -->
+            <LinearLayout
+                android:id="@+id/customRgbPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="6dp"
+                android:background="#0A000000"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="R"
+                            android:textColor="@color/ink"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                        <SeekBar
+                            android:id="@+id/customRSeek"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="255"
+                            android:progress="217" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="G"
+                            android:textColor="@color/ink"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                        <SeekBar
+                            android:id="@+id/customGSeek"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="255"
+                            android:progress="119" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="B"
+                            android:textColor="@color/ink"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                        <SeekBar
+                            android:id="@+id/customBSeek"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="255"
+                            android:progress="6" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal">
+
+                        <View
+                            android:id="@+id/customRgbPreview"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp" />
+
+                        <TextView
+                            android:id="@+id/customRgbHex"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="#D97706"
+                            android:textColor="#8A7A5C"
+                            android:textSize="9sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -240,93 +338,75 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ================= SIZE TAB ================= -->
-        <LinearLayout
-            android:id="@+id/sizeTabContent"
+        <!-- ================= BUBBLE TAB ================= -->
+        <ScrollView
+            android:id="@+id/bubbleTabContent"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="14dp"
+            android:layout_height="260dp"
             android:visibility="gone">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:orientation="vertical"
+                android:padding="14dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <TextView
-                        android:id="@+id/bubbleSizeLabel"
-                        android:layout_width="match_parent"
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="Bubble size: 52dp"
-                        android:textColor="@color/ink"
-                        android:textSize="12sp" />
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                    <SeekBar
-                        android:id="@+id/bubbleSizeSeek"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:max="54"
-                        android:progress="16" />
+                        <TextView
+                            android:id="@+id/bubbleSizeLabel"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Bubble size: 52dp"
+                            android:textColor="@color/ink"
+                            android:textSize="12sp" />
+
+                        <SeekBar
+                            android:id="@+id/bubbleSizeSeek"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="54"
+                            android:progress="16" />
+                    </LinearLayout>
+
+                    <!-- Live-scaled replica of the actual floating bubble -
+                         it's the one thing this slider changes that isn't
+                         otherwise visible while this popup covers the real
+                         bubble (see VolumeOverlayService.applyBubbleSizeLive()). -->
+                    <FrameLayout
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="10dp"
+                        android:background="#0A000000">
+
+                        <View
+                            android:id="@+id/bubblePreview"
+                            android:layout_width="20dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center" />
+                    </FrameLayout>
                 </LinearLayout>
 
-                <!-- Live-scaled replica of the actual floating bubble -
-                     it's the one thing this slider changes that isn't
-                     otherwise visible while this popup covers the real
-                     bubble (see VolumeOverlayService.applyBubbleSizeLive()). -->
-                <FrameLayout
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="10dp"
-                    android:background="#0A000000">
-
-                    <View
-                        android:id="@+id/bubblePreview"
-                        android:layout_width="20dp"
-                        android:layout_height="40dp"
-                        android:layout_gravity="center" />
-                </FrameLayout>
+                <!-- Bubble background shape + the 16-icon picker - populated
+                     at runtime, see VolumeOverlayService.populateBubbleList(). -->
+                <LinearLayout
+                    android:id="@+id/bubbleList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="10dp" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/panelWidthLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Volume panel width: 150dp"
-                android:textColor="@color/ink"
-                android:textSize="12sp" />
-
-            <SeekBar
-                android:id="@+id/panelWidthSeek"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="180"
-                android:progress="70" />
-
-            <TextView
-                android:id="@+id/panelHeightLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Volume panel height: 150dp"
-                android:textColor="@color/ink"
-                android:textSize="12sp" />
-
-            <SeekBar
-                android:id="@+id/panelHeightSeek"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="170"
-                android:progress="60" />
-        </LinearLayout>
+        </ScrollView>
 
         <!-- ================= CONF TAB ================= -->
         <LinearLayout
@@ -393,19 +473,59 @@
                 android:progress="20" />
         </LinearLayout>
 
-        <!-- ================= FORM TAB ================= -->
+        <!-- ================= PANEL TAB ================= -->
         <ScrollView
-            android:id="@+id/formTabContent"
+            android:id="@+id/panelTabContent"
             android:layout_width="match_parent"
             android:layout_height="260dp"
             android:visibility="gone">
 
             <LinearLayout
-                android:id="@+id/formList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="6dp" />
+                android:padding="14dp">
+
+                <TextView
+                    android:id="@+id/panelWidthLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Volume panel width: 150dp"
+                    android:textColor="@color/ink"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/panelWidthSeek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="180"
+                    android:progress="70" />
+
+                <TextView
+                    android:id="@+id/panelHeightLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="Volume panel height: 150dp"
+                    android:textColor="@color/ink"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/panelHeightSeek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="170"
+                    android:progress="60" />
+
+                <!-- Panel style + Panel background shape - populated at
+                     runtime, see VolumeOverlayService.populatePanelList(). -->
+                <LinearLayout
+                    android:id="@+id/panelList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="10dp" />
+            </LinearLayout>
         </ScrollView>
 
     </FrameLayout>

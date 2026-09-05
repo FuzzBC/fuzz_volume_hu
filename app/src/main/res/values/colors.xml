@@ -4,4 +4,11 @@
     <color name="ink">#3A2F1C</color>
     <color name="ink_dim">#77592A</color>
     <color name="accent">#B3691F</color>
+
+    <!-- MainActivity only (launcher screen) - a deliberate dark scheme,
+         independent of the floating overlay's own fixed cream skin above,
+         which still uses cream/ink/accent unchanged. -->
+    <color name="main_dark_bg">#1C1712</color>
+    <color name="main_dark_ink">#EFE8D6</color>
+    <color name="main_dark_ink_dim">#B7A88C</color>
 </resources>
