@@ -27,6 +27,32 @@ allprojects {
     }
 }
 
+// Task to run DeleteBuild.bat before builds
+tasks.register("cleanJunkFiles", Exec) {
+    group = "build"
+    description = "Delete build folders and desktop.ini files before building"
+
+    def batchFile = file("DeleteBuild.bat")
+    if (batchFile.exists()) {
+        commandLine("cmd", "/c", batchFile.absolutePath)
+    } else {
+        println("DeleteBuild.bat not found, skipping junk file cleanup")
+        enabled = false
+    }
+}
+
+// Make all build tasks depend on cleanJunkFiles. This has to be wired via
+// allprojects, not a bare tasks.whenTaskAdded on the root project alone -
+// assembleDebug/assembleRelease/build live on the :app subproject's own
+// TaskContainer, which the root project's whenTaskAdded never observes.
+allprojects {
+    tasks.whenTaskAdded {
+        if (name == "assembleDebug" || name == "assembleRelease" || name == "build") {
+            dependsOn(rootProject.tasks.named("cleanJunkFiles"))
+        }
+    }
+}
+
 tasks.register('clean', Delete) {
     delete "D:/AndroidBuilds/${rootProject.name}"
 }

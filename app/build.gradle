@@ -13,6 +13,18 @@ def appVersionCode = project.hasProperty('testVersionCode')
 def appVersionMajor = versionProps['versionMajor'] ? versionProps['versionMajor'].toInteger() : 1
 def appVersionName = "${appVersionMajor}." + String.format("%03d", appVersionCode)
 
+// Resolves the current commit's short hash for the APK filename below.
+// Same helper as FuzzBC/GadgetBridge's app/build.gradle.
+final def getGitHashShort = { ->
+    try {
+        return providers.exec {
+            commandLine('git', 'rev-parse', '--short', 'HEAD')
+        }.standardOutput.asText.get().trim()
+    } catch (ignored) {
+        return null
+    }
+}
+
 android {
     compileSdk 34
     namespace "com.fuzz.volumehu"
@@ -46,6 +58,56 @@ android {
         checkReleaseBuilds false
         abortOnError false
     }
+
+}
+
+// Build APK filename: <appname>-<buildType>-<dateTime>-<commit>.apk
+// AGP 9's ApplicationExtension no longer exposes the legacy
+// applicationVariants DSL at all (not just deprecated - fully removed), so
+// this has to go through the modern Variant API instead.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            def dateTime = new Date().format('yyyyMMdd-HHmmss')
+            def gitCommit = getGitHashShort()
+            def commitSuffix = gitCommit ? "-${gitCommit}" : ""
+            def appName = "FuZz_Volume_HU"
+            def buildType = variant.buildType
+            output.outputFileName.set("${appName}-${buildType}-${dateTime}${commitSuffix}.apk")
+        }
+    }
+}
+
+// Task to copy APKs to common build folder
+tasks.register('copyApksToCommonFolder') {
+    group = "build"
+    description = "Copy built APKs to common AndroidBuilds folder"
+
+    doLast {
+        def outputDir = file("D:/Works_DriveUpload/__AndroidBuilds")
+        outputDir.mkdirs()
+
+        // buildDir is redirected (see root build.gradle) to keep Drive sync
+        // from churning on every build - the output path must follow it,
+        // not assume the default "<module>/build" location.
+        def apkFiles = fileTree("${buildDir}/outputs/apk") {
+            include "**/*.apk"
+        }
+
+        apkFiles.each { apkFile ->
+            copy {
+                from apkFile
+                into outputDir
+            }
+            println "Copied APK to: ${new File(outputDir, apkFile.name).absolutePath}"
+        }
+    }
+}
+
+// Make assemble tasks depend on copy task
+afterEvaluate {
+    tasks.findByName('assembleDebug')?.finalizedBy 'copyApksToCommonFolder'
+    tasks.findByName('assembleRelease')?.finalizedBy 'copyApksToCommonFolder'
 }
 
 dependencies {

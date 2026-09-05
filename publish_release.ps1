@@ -19,12 +19,18 @@ $versionMajor = if ($versionPropsText -match 'versionMajor\s*=\s*(\d+)') { [int]
 $versionName = "$versionMajor." + $versionCode.ToString('000')
 $tag = "V$versionName"
 
-$builtApkPath = "D:\AndroidBuilds\$(Split-Path $root -Leaf)\app\outputs\apk\release\app-release.apk"
-if (-not (Test-Path $builtApkPath)) { Write-Error "APK not found at $builtApkPath - build the release variant first."; exit 1 }
+# outputFileName now bakes in a build timestamp + git commit (see
+# app/build.gradle's androidComponents.onVariants block), so it can no
+# longer be hardcoded here - grab the most recently built release APK from
+# the output directory instead.
+$releaseApkDir = "D:\AndroidBuilds\$(Split-Path $root -Leaf)\app\outputs\apk\release"
+$builtApk = Get-ChildItem -Path $releaseApkDir -Filter '*.apk' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $builtApk) { Write-Error "No release APK found in $releaseApkDir - build the release variant first."; exit 1 }
+$builtApkPath = $builtApk.FullName
 $apkName = "FuZzVolumeHU_$tag.apk"
 # gh uploads assets under the basename of the path given to it, so the built
-# app-release.apk is copied under the name we actually want released first.
-$apkPath = Join-Path (Split-Path $builtApkPath) $apkName
+# APK is copied under the name we actually want released first.
+$apkPath = Join-Path $releaseApkDir $apkName
 Copy-Item -Path $builtApkPath -Destination $apkPath -Force
 
 $releaseNotes = "No changelog entry found for $versionName."
