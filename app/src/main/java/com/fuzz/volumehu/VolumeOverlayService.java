@@ -1419,9 +1419,15 @@ public class VolumeOverlayService extends Service {
             TextView tname = item.findViewById(R.id.tname);
             tname.setText(themes[i].name);
 
-            GradientDrawable bg = new GradientDrawable(
-                    GradientDrawable.Orientation.TL_BR,
-                    new int[]{themes[i].low, themes[i].mid, themes[i].high});
+            // A flat, precise fill - themes[i].mid is the theme's actual
+            // representative color (what "flat merge" mode shows everywhere,
+            // and the base Dynamic mode mixes toward red from). This used to
+            // be a diagonal low/mid/high gradient previewing the theme's
+            // whole dynamic range, but that meant no swatch ever showed one
+            // clean, exact color - just a blend - and looked inconsistent
+            // next to the Custom swatch's own plain solid fill right above.
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(themes[i].mid);
             bg.setShape(GradientDrawable.OVAL);
             ball.setBackground(bg);
 

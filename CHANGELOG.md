@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.048
+- Preset theme swatches are now a flat, precise color instead of a diagonal low/mid/high gradient "splash" - each ball shows its theme's actual representative color (the same one "flat merge" mode uses everywhere), consistent with the Custom swatch's own plain solid fill right above them.
+
 ## 1.047
 - Bubble icon is now 80% of the bubble's own size (was 40%) and scales with it via the Bubble tab's size slider, same as before - just bigger.
 - Bubble icon gets a soft drop shadow, shaped to the glyph itself rather than a rectangle behind the whole icon view.
