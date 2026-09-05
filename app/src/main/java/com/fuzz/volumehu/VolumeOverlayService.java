@@ -95,6 +95,15 @@ public class VolumeOverlayService extends Service {
     // 22/52 icon-to-width ratio.
     private static final float TAB_ASPECT = 108f / 52f;
     private static final float TAB_ICON_RATIO = 0.80f; // 80% of the bubble's own width - scales with it via updateTabAppearance()
+    /** How much of the actual chosen color shows through on the bubble/panel/
+     *  buttons, vs. the neutral cream/tan base underneath - see
+     *  buildBubbleDrawable(), applyPanelTheme(), tintSmallButton() and
+     *  animateMorphOpen(). Used to be 0.22-0.4 (mostly cream, a little
+     *  color), which washed a saturated pick like pure red down to pink -
+     *  0.85 keeps just enough of the neutral base for the surface to still
+     *  read as "tinted cream", not a flat color swatch, without diluting
+     *  the actual chosen color past recognition. */
+    private static final float SURFACE_TINT_STRENGTH = 0.85f;
     // The settings popup card's own size is fixed - only the bubble and
     // the volume panel are user-resizable (Size tab).
     private static final int SETTINGS_POPUP_DIAMETER_DP = 260;
@@ -708,7 +717,7 @@ public class VolumeOverlayService extends Service {
                     if (panelCard != null) {
                         if (endRadii != null) {
                             GradientDrawable bg = new GradientDrawable();
-                            bg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
+                            bg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, SURFACE_TINT_STRENGTH));
                             float[] radii = new float[8];
                             for (int i = 0; i < 8; i++) radii[i] = bubbleRadius + (endRadii[i] - bubbleRadius) * t;
                             bg.setCornerRadii(radii);
@@ -1714,7 +1723,7 @@ public class VolumeOverlayService extends Service {
     private GradientDrawable buildBubbleDrawable(int shape, int volumeColor) {
         if (shape == 4) return null; // Clear
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(mixColors(Color.parseColor("#E6E2D8"), volumeColor, 0.4f));
+        bg.setColor(mixColors(Color.parseColor("#E6E2D8"), volumeColor, SURFACE_TINT_STRENGTH));
         float r999 = dp(999);
         switch (shape) {
             case 1: bg.setCornerRadius(dp(14)); break; // Rounded
@@ -1740,7 +1749,7 @@ public class VolumeOverlayService extends Service {
                 panelCard.setBackground(null); // Clear
             } else {
                 GradientDrawable cardBg = new GradientDrawable();
-                cardBg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, 0.22f));
+                cardBg.setColor(mixColors(Color.parseColor("#E6E2D8"), color, SURFACE_TINT_STRENGTH));
                 switch (panelBgShape) {
                     case 1: cardBg.setCornerRadius(dp(18)); break; // Rounded
                     case 2: cardBg.setCornerRadius(0); break; // Square
@@ -1758,7 +1767,7 @@ public class VolumeOverlayService extends Service {
     private void tintSmallButton(View btn, int color) {
         if (btn == null) return;
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(mixColors(Color.parseColor("#DED9CC"), color, 0.35f));
+        bg.setColor(mixColors(Color.parseColor("#DED9CC"), color, SURFACE_TINT_STRENGTH));
         bg.setCornerRadius(dp(999)); // fully rounded (pill) - matches bg_small_button.xml
         btn.setBackground(bg);
     }

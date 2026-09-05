@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.049
+- **Fixes washed-out colors on the actual bubble/panel/buttons**, not just the theme swatches (1.048 fixed those): the real widget backgrounds mixed only 22-40% of the chosen color into a cream/tan base, so a saturated pick like pure red rendered as a pale pink - real reported symptom, "when i set Red, show very low led color". That blend ratio is now 85% real color everywhere it's used (bubble background, panel card, small buttons, and the shape-morph open animation), keeping just enough of the neutral base for the surface to still read as tinted cream rather than a flat swatch, without diluting the actual chosen color past recognition.
+
 ## 1.048
 - Preset theme swatches are now a flat, precise color instead of a diagonal low/mid/high gradient "splash" - each ball shows its theme's actual representative color (the same one "flat merge" mode uses everywhere), consistent with the Custom swatch's own plain solid fill right above them.
 
